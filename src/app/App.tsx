@@ -1,4 +1,8 @@
 import { HashRouter, NavLink, Route, Routes } from 'react-router-dom';
+import { Ajustes } from '../features/ajustes/Ajustes';
+import { Estadisticas } from '../features/estadisticas/Estadisticas';
+import { Historial } from '../features/historial/Historial';
+import { Informe } from '../features/informe/Informe';
 import { Formulario } from '../features/crisis/Formulario';
 import { Rapida } from '../features/crisis/Rapida';
 import { Inicio } from '../features/inicio/Inicio';
@@ -23,6 +27,10 @@ export function App() {
           <Route path="/" element={<Inicio />} />
           <Route path="/rapida" element={<Rapida />} />
           <Route path="/crisis/:id" element={<Formulario />} />
+          <Route path="/historial" element={<Historial />} />
+          <Route path="/estadisticas" element={<Estadisticas />} />
+          <Route path="/informe" element={<Informe />} />
+          <Route path="/ajustes" element={<Ajustes />} />
         </Routes>
       </main>
       <nav className="fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]">
