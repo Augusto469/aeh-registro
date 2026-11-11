@@ -1,4 +1,5 @@
-import { HashRouter, NavLink, Route, Routes } from 'react-router-dom';
+import { useEffect } from 'react';
+import { HashRouter, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { Ajustes } from '../features/ajustes/Ajustes';
 import { Estadisticas } from '../features/estadisticas/Estadisticas';
 import { Historial } from '../features/historial/Historial';
@@ -19,9 +20,17 @@ const PESTANAS = [
  * HashRouter (rutas tipo #/historial): GitHub Pages no sabe redirigir rutas
  * de una SPA, y con el hash la app funciona en cualquier subcarpeta sin configuración.
  */
+/** Al cambiar de pantalla, vuelve arriba (si no, queda el scroll de la pantalla anterior). */
+function VolverArriba() {
+  const { pathname } = useLocation();
+  useEffect(() => window.scrollTo(0, 0), [pathname]);
+  return null;
+}
+
 export function App() {
   return (
     <HashRouter>
+      <VolverArriba />
       <main>
         <Routes>
           <Route path="/" element={<Inicio />} />

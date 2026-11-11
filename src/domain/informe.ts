@@ -69,8 +69,8 @@ export function construirInforme(
     {
       etiqueta: 'Gravedad',
       valor:
-        `${r.porGravedad.leve} leves, ${r.porGravedad.moderada} moderadas, ${r.porGravedad.grave} graves` +
-        (r.sinGravedad ? `, ${r.sinGravedad} sin dato` : ''),
+        `Leves: ${r.porGravedad.leve}, moderadas: ${r.porGravedad.moderada}, graves: ${r.porGravedad.grave}` +
+        (r.sinGravedad ? `, sin dato: ${r.sinGravedad}` : ''),
     },
     { etiqueta: 'Con compromiso de lengua o garganta/laringe', valor: String(r.viaAerea) },
     {
@@ -88,9 +88,9 @@ export function construirInforme(
     },
     {
       etiqueta: 'Atención médica',
-      valor: `${r.porAtencion.consulta} consultas, ${r.porAtencion.emergencia} emergencias, ${r.porAtencion.internacion} internaciones, ${r.porAtencion.ninguna} sin atención`,
+      valor: `Consultas: ${r.porAtencion.consulta}, emergencias: ${r.porAtencion.emergencia}, internaciones: ${r.porAtencion.internacion}, sin atención: ${r.porAtencion.ninguna}`,
     },
-    { etiqueta: 'Días sin poder trabajar o estudiar', valor: String(r.diasPerdidos) },
+    { etiqueta: 'Días sin poder trabajar o estudiar', valor: String(r.diasPerdidos).replace('.', ',') },
   ];
 
   const avisos: string[] = [];

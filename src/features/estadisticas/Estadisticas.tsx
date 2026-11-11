@@ -65,7 +65,7 @@ export function Estadisticas() {
         <Dato valor={String(r.total)} texto="crisis" />
         <Dato valor={r.crisisPorMes.toFixed(1).replace('.', ',')} texto="promedio por mes" />
         <Dato valor={r.duracionMediaHoras === null ? '-' : formatoDuracion(r.duracionMediaHoras)} texto="duración promedio" />
-        <Dato valor={String(r.diasPerdidos)} texto="días sin trabajar o estudiar" />
+        <Dato valor={String(r.diasPerdidos).replace('.', ',')} texto="días sin trabajar o estudiar" />
         <Dato valor={String(r.viaAerea)} texto="con lengua o garganta" />
         <Dato valor={String(r.porAtencion.emergencia + r.porAtencion.internacion)} texto="emergencias e internaciones" />
       </div>

@@ -79,7 +79,8 @@ describe('estadísticas', () => {
     expect(r.duracionMaximaHoras).toBe(48);
     // 2 h y 2 h hasta la primera dosis
     expect(r.horasHastaTratamiento).toBe(2);
-    expect(r.crisisPorMes).toBeCloseTo(4 / 3);
+    // 90 días son 2,96 meses
+    expect(r.crisisPorMes).toBeCloseTo(4 / (90 / (365.25 / 12)));
   });
 
   it('con lista vacía no divide por cero', () => {
@@ -107,8 +108,8 @@ describe('informe', () => {
   it('arma el resumen con textos listos para mostrar', () => {
     const valor = (e: string) => informe.resumen.find((f) => f.etiqueta === e)?.valor;
     expect(valor('Crisis registradas')).toBe('4');
-    expect(valor('Promedio por mes')).toBe('1,3');
-    expect(valor('Gravedad')).toBe('1 leves, 1 moderadas, 1 graves, 1 sin dato');
+    expect(valor('Promedio por mes')).toBe('1,4');
+    expect(valor('Gravedad')).toBe('Leves: 1, moderadas: 1, graves: 1, sin dato: 1');
     expect(valor('Con compromiso de lengua o garganta/laringe')).toBe('1');
     expect(valor('Duración promedio')).toBe('40 h');
     expect(valor('Días sin poder trabajar o estudiar')).toBe('4');

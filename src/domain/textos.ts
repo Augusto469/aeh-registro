@@ -57,4 +57,4 @@ export function textoMedicacion(c: Crisis, separador = '\n'): string {
   return c.tratamientos.map(textoTratamiento).join(separador);
 }
 
-export const textoDiasPerdidos = (c: Crisis) => (c.diasPerdidos === null ? SIN_DATO : String(c.diasPerdidos));
+export const textoDiasPerdidos = (c: Crisis) => (c.diasPerdidos === null ? SIN_DATO : String(c.diasPerdidos).replace('.', ','));

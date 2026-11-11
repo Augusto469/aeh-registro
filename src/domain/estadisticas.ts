@@ -3,7 +3,7 @@
  * Quien llama decide el período y filtra antes con `enPeriodo`.
  */
 import { afectaViaAerea, duracionHoras } from './crisis';
-import { claveMes, horasEntre, mesesEntre } from './fechas';
+import { claveMes, diasEntre, horasEntre, mesesEntre } from './fechas';
 import {
   ATENCIONES,
   DESENCADENANTES,
@@ -108,6 +108,8 @@ export interface Resumen {
   crisisPorMes: number;
 }
 
+const DIAS_POR_MES = 365.25 / 12;
+
 const promedio = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 
 export function resumen(lista: Crisis[], periodo: Periodo): Resumen {
@@ -155,7 +157,9 @@ export function resumen(lista: Crisis[], periodo: Periodo): Resumen {
   r.duracionMediaHoras = promedio(duraciones);
   r.duracionMaximaHoras = duraciones.length ? Math.max(...duraciones) : null;
   r.horasHastaTratamiento = promedio(demoras);
-  const meses = mesesEntre(periodo.desde, periodo.hasta).length || 1;
+  // Meses reales del período (por días), no meses de calendario tocados:
+  // del 12/05 al 11/11 son 6 meses, aunque abarque 7 meses de calendario.
+  const meses = Math.max(1, (diasEntre(periodo.desde, periodo.hasta) + 1) / DIAS_POR_MES);
   r.crisisPorMes = lista.length / meses;
   return r;
 }
