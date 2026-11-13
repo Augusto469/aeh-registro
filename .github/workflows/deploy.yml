@@ -1,10 +1,13 @@
-# Publica la app en GitHub Pages cada vez que se sube un cambio a main.
-# Requiere activar Pages en el repositorio: Settings > Pages > Source: "GitHub Actions".
+# Publica la app en GitHub Pages.
+# PAUSADO: el repositorio es privado y la cuenta gratuita no permite Pages en repos privados,
+# así que por ahora solo se ejecuta a mano (Actions > Publicar en GitHub Pages > Run workflow).
+# Para reactivar la publicación automática (con GitHub Pro o repo público), volver a agregar:
+#   push:
+#     branches: [main]
+# y activar Pages en Settings > Pages > Source: "GitHub Actions".
 name: Publicar en GitHub Pages
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:

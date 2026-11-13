@@ -41,7 +41,7 @@ Las decisiones técnicas y lo que queda pendiente están en [docs/decisiones.md]
 
 ## Publicación
 
-`.github/workflows/deploy.yml` corre los tests, compila y publica en GitHub Pages con cada cambio en `main`. En el repositorio hay que elegir **Settings > Pages > Source: GitHub Actions**.
+`.github/workflows/deploy.yml` corre los tests, compila y publica en GitHub Pages. **Está pausado**: el repositorio es privado y la cuenta gratuita no permite Pages en repositorios privados. Para reactivarlo (con GitHub Pro, gratis con el Student Pack), hay que volver a agregar el disparador `push` a `main` en ese archivo y elegir **Settings > Pages > Source: GitHub Actions**.
 
 ## Privacidad
 
