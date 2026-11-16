@@ -13,7 +13,8 @@ App personal para registrar crisis de angioedema hereditario y compartir un resu
 - **Historial:** lista con filtros y calendario.
 - **Estadísticas:** crisis por mes, zonas, desencadenantes, síntomas previos y uso de medicación.
 - **Informe:** PDF de un período, con resumen, gráfico, tablas y detalle; fotos y notas opcionales.
-- **Respaldo:** exportar e importar JSON (con o sin fotos y videos) y exportar CSV.
+- **Respaldo:** compartir, descargar e importar (con o sin fotos y videos, con contraseña opcional) y exportar CSV.
+- **Borrador automático:** lo que se carga en el formulario no se pierde si se sale sin guardar.
 
 ## Cómo usarla en desarrollo
 
@@ -47,4 +48,4 @@ La app queda en <https://augusto469.github.io/aeh-registro/>. Para instalarla en
 
 ## Privacidad
 
-El código no contiene datos de salud. Los registros viven en el navegador de cada dispositivo y el respaldo JSON no está cifrado: hay que guardarlo en un lugar privado.
+El código no contiene datos de salud. Los registros viven en el navegador de cada dispositivo. El respaldo se puede proteger con contraseña; sin ella, cualquiera que tenga el archivo puede leerlo, así que hay que guardarlo en un lugar privado.

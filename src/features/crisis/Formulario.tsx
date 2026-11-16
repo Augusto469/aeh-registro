@@ -1,7 +1,15 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { eliminarCrisis, guardarCrisis, listarMedicamentos, obtenerCrisis } from '../../db/repo';
+import {
+  eliminarBorrador,
+  eliminarCrisis,
+  guardarBorrador,
+  guardarCrisis,
+  listarMedicamentos,
+  obtenerBorrador,
+  obtenerCrisis,
+} from '../../db/repo';
 import { crearCrisis, nuevoId, validarCrisis } from '../../domain/crisis';
 import { ahoraLocal, soloFecha } from '../../domain/fechas';
 import {
@@ -38,25 +46,98 @@ export function Formulario() {
   const [c, setC] = useState<Crisis | null>(null);
   const [noExiste, setNoExiste] = useState(false);
   const [error, setError] = useState('');
+  /** true si lo que se muestra salió de un borrador que no se había guardado */
+  const [recuperado, setRecuperado] = useState(false);
   const saliendo = useRef(false);
+  /** Hay cambios sin guardar: solo entonces se escribe el borrador. */
+  const sucio = useRef(false);
+  const actual = useRef<Crisis | null>(null);
   const medicamentos = useLiveQuery(listarMedicamentos, []) ?? [];
 
+  const cargar = useCallback(
+    async (usarBorrador: boolean): Promise<{ crisis: Crisis; deBorrador: boolean } | null> => {
+      if (!id) return null;
+      const borrador = usarBorrador ? await obtenerBorrador(id) : undefined;
+      if (esNueva) {
+        // Crisis pasada: arranca cerrada; las fechas se corrigen a mano.
+        const ahora = ahoraLocal();
+        return { crisis: borrador ?? crearCrisis({ inicio: ahora, fin: ahora }), deBorrador: !!borrador };
+      }
+      const guardada = await obtenerCrisis(id);
+      if (!guardada) {
+        void eliminarBorrador(id);
+        return null;
+      }
+      return { crisis: borrador ?? guardada, deBorrador: !!borrador };
+    },
+    [id, esNueva],
+  );
+
+  const mostrar = (r: { crisis: Crisis; deBorrador: boolean } | null) => {
+    if (!r) return setNoExiste(true);
+    actual.current = r.crisis;
+    sucio.current = r.deBorrador;
+    setC(r.crisis);
+    setRecuperado(r.deBorrador);
+  };
+
   useEffect(() => {
-    if (esNueva) {
-      // Crisis pasada: arranca cerrada; las fechas se corrigen a mano.
-      const ahora = ahoraLocal();
-      setC(crearCrisis({ inicio: ahora, fin: ahora }));
-    } else if (id) {
-      void obtenerCrisis(id).then((x) => (x ? setC(x) : setNoExiste(true)));
-    }
-  }, [id, esNueva]);
+    let vigente = true;
+    void cargar(true).then((r) => vigente && mostrar(r));
+    return () => {
+      vigente = false;
+    };
+  }, [cargar]);
+
+  // ----- Borrador automático -----
+  // Lo que se va cargando se guarda aparte hasta tocar "Guardar". Así no se pierde si se
+  // sale sin querer o si el celular recarga la app al volver de la cámara.
+  const escribirBorrador = useCallback(() => {
+    if (!id || !sucio.current || saliendo.current || !actual.current) return;
+    void guardarBorrador(id, actual.current);
+  }, [id]);
+
+  useEffect(() => {
+    actual.current = c;
+    if (!sucio.current) return;
+    const t = setTimeout(escribirBorrador, 400);
+    return () => clearTimeout(t);
+  }, [c, escribirBorrador]);
+
+  useEffect(() => {
+    // Al abrir la cámara o cambiar de app la página queda oculta: se guarda en el momento.
+    const alOcultar = () => {
+      if (document.visibilityState === 'hidden') escribirBorrador();
+    };
+    document.addEventListener('visibilitychange', alOcultar);
+    window.addEventListener('pagehide', escribirBorrador);
+    return () => {
+      document.removeEventListener('visibilitychange', alOcultar);
+      window.removeEventListener('pagehide', escribirBorrador);
+      escribirBorrador(); // al salir de la pantalla sin guardar
+    };
+  }, [escribirBorrador]);
 
   if (noExiste) return <Pagina titulo="Crisis" atras><p>No se encontró esta crisis.</p></Pagina>;
-  if (!c) return null;
+  if (!c || !id) return null;
 
   const cambiar = (parcial: Partial<Crisis>) => {
+    sucio.current = true;
     setC({ ...c, ...parcial });
     setError('');
+  };
+
+  /** Una foto agregada también cuenta como cambio: el borrador conserva la crisis a la que pertenece. */
+  const alAgregarMedio = () => {
+    sucio.current = true;
+    escribirBorrador();
+  };
+
+  const descartarBorrador = async () => {
+    if (!confirm(esNueva ? '¿Descartar lo cargado y empezar de cero?' : '¿Descartar los cambios sin guardar?')) return;
+    sucio.current = false;
+    await eliminarBorrador(id);
+    mostrar(await cargar(false));
   };
 
   // `saliendo` evita que un doble toque guarde dos veces y retroceda dos pantallas.
@@ -67,6 +148,7 @@ export function Formulario() {
     saliendo.current = true;
     try {
       await guardarCrisis(c);
+      await eliminarBorrador(id);
       navegar(-1);
     } catch {
       saliendo.current = false;
@@ -80,6 +162,7 @@ export function Formulario() {
     saliendo.current = true;
     try {
       await eliminarCrisis(c.id);
+      await eliminarBorrador(id);
       navegar(-1);
     } catch {
       saliendo.current = false;
@@ -124,6 +207,14 @@ export function Formulario() {
         </button>
       }
     >
+      {recuperado && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-amber-900">
+          <p>{esNueva ? 'Recuperamos lo que estabas cargando y no llegaste a guardar.' : 'Esta crisis tiene cambios que no llegaste a guardar.'}</p>
+          <button type="button" className="mt-1 text-sm underline" onClick={descartarBorrador}>
+            {esNueva ? 'Descartar y empezar de cero' : 'Descartar esos cambios'}
+          </button>
+        </div>
+      )}
       {error && <p className="rounded-xl border border-red-300 bg-red-50 p-3 text-red-800">{error}</p>}
 
       <Seccion titulo="Cuándo">
@@ -239,7 +330,7 @@ export function Formulario() {
       </Seccion>
 
       <Seccion titulo="Fotos y videos">
-        <Medios crisisId={c.id} />
+        <Medios crisisId={c.id} alAgregar={alAgregarMedio} />
       </Seccion>
 
       {error && <p className="rounded-xl border border-red-300 bg-red-50 p-3 text-red-800">{error}</p>}

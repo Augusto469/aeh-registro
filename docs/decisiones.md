@@ -33,11 +33,20 @@ Cada punto dice qué se eligió y por qué. Si alguna deja de servir, este es el
 - **Importar fusiona, no reemplaza.** Agrega lo que falta y nunca borra crisis locales.
 - Las fotos y videos son opcionales en el respaldo y viajan en base64. Con muchos videos el archivo puede ser muy grande para generarlo en el celular.
 - El CSV usa `;` y BOM porque es lo que Excel en español abre bien.
+- **Contraseña opcional** (`domain/cifrado.ts`): la clave sale de la contraseña con PBKDF2-SHA256 (600.000 iteraciones) y el contenido se cifra con AES-GCM de 256 bits, todo con la Web Crypto API del navegador, sin librerías. El archivo cifrado es un JSON con `app` y `cifrado` (sal, iv y datos en base64). Si se pierde la contraseña no hay recuperación.
+- **Compartir** usa la hoja de compartir del celular. Muchos Android no dejan compartir `.json`, así que se prueba primero `.json` y después el mismo contenido como `.txt`; importar acepta los dos. Si el navegador no comparte archivos, se descarga.
+- La fecha del último respaldo se anota recién cuando el archivo salió de la app (descarga o compartir confirmado), para que cancelar no apague el aviso de "sin respaldo".
+
+## Borrador del formulario
+
+- Lo que se carga en el formulario se guarda como borrador (tabla `ajustes`, clave `borrador:<id>`, o `borrador:nueva`) mientras no se toque "Guardar": con una pausa corta al escribir, al ocultarse la página (abrir la cámara, cambiar de app) y al salir de la pantalla. Así no se pierde si Android recarga la app al volver de la cámara.
+- Al reabrir el formulario se recupera el borrador y se avisa, con la opción de descartarlo. Guardar o eliminar la crisis lo borra.
+- Un borrador no es una crisis: no cuenta en estadísticas ni viaja en el respaldo. La limpieza de archivos huérfanos conserva las fotos de una crisis con borrador pendiente.
 
 ## Riesgos conocidos
 
 - **El navegador puede borrar los datos** si falta espacio; en iPhone, también si la app no está instalada en la pantalla de inicio y no se usa por un tiempo. Se pide almacenamiento persistente al arrancar y el inicio avisa si pasaron más de 30 días sin respaldo.
-- **Sin cifrado propio.** La protección es el bloqueo del celular. El respaldo tampoco está cifrado.
+- **Los datos en el celular no están cifrados por la app.** La protección es el bloqueo del celular. El respaldo se puede proteger con contraseña, pero es opcional; el CSV y el PDF nunca van cifrados.
 - **Toolchain fijado por Node 16** (Vite 4, Vitest 0.34, Workbox 7.0.0, configuración en CommonJS). Conviene actualizar Node y después estas dependencias.
 - **Falta probar en un celular real**: instalación, cámara, compartir PDF y uso sin conexión, en Android y en iPhone.
 

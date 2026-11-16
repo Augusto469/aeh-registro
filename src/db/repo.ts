@@ -49,9 +49,36 @@ export async function eliminarMedio(id: string): Promise<void> {
   await db.medios.delete(id);
 }
 
-/** Borra archivos de crisis que nunca se guardaron (por ejemplo, si se cerró la app a mitad de carga). */
+// ---------- Borradores ----------
+// Lo que se está cargando en el formulario y todavía no se guardó. Vive en `ajustes`
+// (clave 'borrador:<id>', o 'borrador:nueva' para una crisis nueva) para no cambiar el
+// esquema. No viaja en el respaldo ni cuenta en las estadísticas.
+
+const PREFIJO_BORRADOR = 'borrador:';
+
+export async function obtenerBorrador(id: string): Promise<Crisis | undefined> {
+  const a = await db.ajustes.get(PREFIJO_BORRADOR + id);
+  return a ? (a.valor as Crisis) : undefined;
+}
+
+export async function guardarBorrador(id: string, c: Crisis): Promise<void> {
+  await db.ajustes.put({ clave: PREFIJO_BORRADOR + id, valor: c });
+}
+
+export async function eliminarBorrador(id: string): Promise<void> {
+  await db.ajustes.delete(PREFIJO_BORRADOR + id);
+}
+
+/**
+ * Borra archivos de crisis que nunca se guardaron (por ejemplo, si se cerró la app a mitad
+ * de carga). Los de una crisis con borrador pendiente se conservan.
+ */
 export async function limpiarMediosHuerfanos(): Promise<void> {
   const ids = new Set((await db.crisis.toArray()).filter((c) => !c.eliminadoEn).map((c) => c.id));
+  for (const b of await db.ajustes.where('clave').startsWith(PREFIJO_BORRADOR).toArray()) {
+    const id = (b.valor as Crisis | undefined)?.id;
+    if (id) ids.add(id);
+  }
   const huerfanos = (await db.medios.toArray()).filter((m) => !ids.has(m.crisisId)).map((m) => m.id);
   if (huerfanos.length) await db.medios.bulkDelete(huerfanos);
 }
@@ -113,9 +140,15 @@ export async function exportarRespaldo(incluirMedios: boolean): Promise<Respaldo
       medios.push({ ...resto, datos: await blobABase64(blob) });
     }
   }
-  const respaldo = crearRespaldo({ crisis, medicamentos, perfil, medios });
-  await db.ajustes.put({ clave: 'ultimoRespaldo', valor: respaldo.exportadoEn });
-  return respaldo;
+  return crearRespaldo({ crisis, medicamentos, perfil, medios });
+}
+
+/**
+ * Anota la fecha del último respaldo. Se llama recién cuando el archivo salió de la app
+ * (descarga o compartir confirmado): si se cancela, el aviso de "sin respaldo" sigue vigente.
+ */
+export async function registrarRespaldoHecho(exportadoEn: string): Promise<void> {
+  await db.ajustes.put({ clave: 'ultimoRespaldo', valor: exportadoEn });
 }
 
 export interface ResultadoImportacion {

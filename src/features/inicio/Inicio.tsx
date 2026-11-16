@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Link } from 'react-router-dom';
-import { guardarCrisis, listarCrisis, obtenerUltimoRespaldo } from '../../db/repo';
+import { guardarCrisis, listarCrisis, obtenerBorrador, obtenerUltimoRespaldo } from '../../db/repo';
 import { estaIncompleta } from '../../domain/crisis';
 import { ahoraLocal, soloFecha } from '../../domain/fechas';
 import { textoInicio, textoZonas } from '../../domain/textos';
@@ -14,6 +14,7 @@ export function Inicio() {
   // useLiveQuery vuelve a ejecutar la consulta cada vez que cambia la base.
   const crisis = useLiveQuery(listarCrisis, []);
   const ultimoRespaldo = useLiveQuery(obtenerUltimoRespaldo, []);
+  const borradorNueva = useLiveQuery(() => obtenerBorrador('nueva'), []);
   if (!crisis) return null;
 
   const abiertas = crisis.filter((c) => c.fin === null);
@@ -49,8 +50,9 @@ export function Inicio() {
         + Registrar crisis
       </Link>
       <Link to="/crisis/nueva" className="btn w-full">
-        Cargar una crisis pasada
+        {borradorNueva ? 'Seguir cargando la crisis pasada' : 'Cargar una crisis pasada'}
       </Link>
+      {borradorNueva && <p className="text-center text-sm text-amber-800">Tenés una crisis a medio cargar, sin guardar.</p>}
 
       {crisis.length > 0 && diasSinRespaldo > DIAS_AVISO_RESPALDO && (
         <Link to="/ajustes" className="block rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-900">

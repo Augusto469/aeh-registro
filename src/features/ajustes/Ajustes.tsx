@@ -10,7 +10,9 @@ import {
   listarMedicamentos,
   obtenerPerfil,
   obtenerUltimoRespaldo,
+  registrarRespaldoHecho,
 } from '../../db/repo';
+import { LARGO_MINIMO_CLAVE, cifrarRespaldo, descifrarRespaldo, esRespaldoCifrado } from '../../domain/cifrado';
 import { nuevoId } from '../../domain/crisis';
 import { crisisACsv } from '../../domain/csv';
 import { ahoraLocal, formatoFecha, aLocal, soloFecha } from '../../domain/fechas';
@@ -96,6 +98,12 @@ function SeccionMedicamentos() {
 function SeccionRespaldo() {
   const ultimo = useLiveQuery(obtenerUltimoRespaldo, []);
   const [conMedios, setConMedios] = useState(false);
+  const [conClave, setConClave] = useState(false);
+  const [clave, setClave] = useState('');
+  const [clave2, setClave2] = useState('');
+  /** Texto de un respaldo cifrado que espera su contraseña para importarse */
+  const [cifradoPendiente, setCifradoPendiente] = useState<string | null>(null);
+  const [claveImportar, setClaveImportar] = useState('');
   const [mensaje, setMensaje] = useState<{ ok: boolean; texto: string } | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const sello = () => soloFecha(ahoraLocal());
@@ -112,18 +120,80 @@ function SeccionRespaldo() {
     }
   };
 
-  const exportarJson = () =>
+  /** Arma el texto del respaldo (cifrado si se pidió) y un resumen de lo que lleva. */
+  const prepararRespaldo = async () => {
+    if (conClave) {
+      if (clave.length < LARGO_MINIMO_CLAVE) throw new Error(`La contraseña debe tener al menos ${LARGO_MINIMO_CLAVE} caracteres.`);
+      if (clave !== clave2) throw new Error('Las dos contraseñas no coinciden.');
+    }
+    const r = await exportarRespaldo(conMedios);
+    const json = JSON.stringify(r);
+    const texto = conClave ? await cifrarRespaldo(json, clave) : json;
+    const resumen =
+      `${r.crisis.filter((c) => !c.eliminadoEn).length} crisis` +
+      (conMedios ? ` y ${r.medios?.length ?? 0} fotos o videos` : '') +
+      (conClave ? ', protegido con contraseña' : '');
+    return { texto, resumen, exportadoEn: r.exportadoEn };
+  };
+
+  const descargarRespaldo = () =>
     ejecutar(async () => {
-      const r = await exportarRespaldo(conMedios);
-      descargar(new Blob([JSON.stringify(r)], { type: 'application/json' }), `respaldo-aeh-${sello()}.json`);
-      return `Respaldo exportado: ${r.crisis.filter((c) => !c.eliminadoEn).length} crisis${conMedios ? ` y ${r.medios?.length ?? 0} fotos o videos` : ''}.`;
+      const { texto, resumen, exportadoEn } = await prepararRespaldo();
+      descargar(new Blob([texto], { type: 'application/json' }), `respaldo-aeh-${sello()}.json`);
+      await registrarRespaldoHecho(exportadoEn);
+      return `Respaldo descargado: ${resumen}.`;
     });
 
-  const importarJson = (archivo: File | undefined) =>
+  const compartirRespaldo = () =>
+    ejecutar(async () => {
+      const { texto, resumen, exportadoEn } = await prepararRespaldo();
+      // Muchos celulares no dejan compartir archivos .json; como texto (.txt) sí.
+      // El contenido es el mismo y la app importa cualquiera de los dos.
+      const candidatos = [
+        new File([texto], `respaldo-aeh-${sello()}.json`, { type: 'application/json' }),
+        new File([texto], `respaldo-aeh-${sello()}.txt`, { type: 'text/plain' }),
+      ];
+      const archivo = candidatos.find((f) => navigator.canShare?.({ files: [f] }));
+      if (!archivo) {
+        descargar(candidatos[0], candidatos[0].name);
+        await registrarRespaldoHecho(exportadoEn);
+        return `Este navegador no permite compartir archivos, así que el respaldo se descargó: ${resumen}.`;
+      }
+      try {
+        await navigator.share({ files: [archivo], title: 'Respaldo de crisis de AEH' });
+      } catch (e) {
+        if (e instanceof DOMException && e.name === 'AbortError') throw new Error('Se canceló: el respaldo no se compartió.');
+        throw new Error('No se pudo compartir el respaldo. Probá con "Descargar".');
+      }
+      await registrarRespaldoHecho(exportadoEn);
+      return `Respaldo compartido: ${resumen}.`;
+    });
+
+  const importarTexto = async (texto: string) => {
+    const r = await importarRespaldo(parsearRespaldo(texto));
+    return `Importación lista: ${r.nuevas} crisis nuevas, ${r.actualizadas} actualizadas, ${r.sinCambios} sin cambios${r.medios ? `, ${r.medios} fotos o videos` : ''}.`;
+  };
+
+  const importarArchivo = (archivo: File | undefined) =>
     archivo &&
     ejecutar(async () => {
-      const r = await importarRespaldo(parsearRespaldo(await archivo.text()));
-      return `Importación lista: ${r.nuevas} crisis nuevas, ${r.actualizadas} actualizadas, ${r.sinCambios} sin cambios${r.medios ? `, ${r.medios} fotos o videos` : ''}.`;
+      const texto = await archivo.text();
+      if (esRespaldoCifrado(texto)) {
+        setCifradoPendiente(texto);
+        setClaveImportar('');
+        return 'Este respaldo está protegido. Escribí la contraseña para importarlo.';
+      }
+      setCifradoPendiente(null);
+      return importarTexto(texto);
+    });
+
+  const importarCifrado = () =>
+    cifradoPendiente &&
+    ejecutar(async () => {
+      const resultado = await importarTexto(await descifrarRespaldo(cifradoPendiente, claveImportar));
+      setCifradoPendiente(null);
+      setClaveImportar('');
+      return resultado;
     });
 
   const exportarCsv = () =>
@@ -137,7 +207,7 @@ function SeccionRespaldo() {
     <Seccion titulo="Respaldo">
       <div className="space-y-3">
         <p className="text-slate-700">
-          Tus datos están solo en este dispositivo. Si perdés el celular o borrás los datos del navegador, se pierden. Exportá un respaldo cada tanto y guardalo en otro lugar.
+          Tus datos están solo en este dispositivo. Si perdés el celular o borrás los datos del navegador, se pierden. Hacé un respaldo cada tanto y guardalo en otro lugar (Drive, correo, otra computadora).
         </p>
         <p className="text-sm text-slate-500">
           Último respaldo: {ultimo ? formatoFecha(aLocal(new Date(ultimo))) : 'nunca'}
@@ -146,17 +216,55 @@ function SeccionRespaldo() {
           <input type="checkbox" className="h-6 w-6 accent-teal-700" checked={conMedios} onChange={(e) => setConMedios(e.target.checked)} />
           Incluir fotos y videos (archivo más pesado)
         </label>
-        <button className="btn-primario w-full" disabled={ocupado} onClick={exportarJson}>
-          Exportar respaldo (JSON)
+        <label className="flex min-h-[44px] items-center gap-3">
+          <input type="checkbox" className="h-6 w-6 accent-teal-700" checked={conClave} onChange={(e) => setConClave(e.target.checked)} />
+          Proteger con contraseña
+        </label>
+        {conClave && (
+          <div className="space-y-3 rounded-xl border border-slate-200 p-3">
+            <label className="block">
+              <span className="etiqueta">Contraseña (mínimo {LARGO_MINIMO_CLAVE} caracteres)</span>
+              <input className="campo" type="password" autoComplete="new-password" value={clave} onChange={(e) => setClave(e.target.value)} />
+            </label>
+            <label className="block">
+              <span className="etiqueta">Repetir contraseña</span>
+              <input className="campo" type="password" autoComplete="new-password" value={clave2} onChange={(e) => setClave2(e.target.value)} />
+            </label>
+            <p className="text-sm text-amber-800">
+              Sin la contraseña el respaldo no se puede abrir, y no hay forma de recuperarla. Anotala en un lugar seguro.
+            </p>
+          </div>
+        )}
+        <button className="btn-primario w-full" disabled={ocupado} onClick={compartirRespaldo}>
+          {ocupado ? 'Preparando…' : 'Compartir respaldo'}
+        </button>
+        <button className="btn w-full" disabled={ocupado} onClick={descargarRespaldo}>
+          Descargar respaldo (JSON)
         </button>
         <label className={`btn w-full cursor-pointer ${ocupado ? 'opacity-50' : ''}`}>
-          Importar respaldo (JSON)
-          <input type="file" accept="application/json,.json" className="hidden" disabled={ocupado}
+          Importar respaldo
+          <input type="file" accept="application/json,text/plain,.json,.txt" className="hidden" disabled={ocupado}
             onChange={(e) => {
-              void importarJson(e.target.files?.[0]);
+              void importarArchivo(e.target.files?.[0]);
               e.target.value = '';
             }} />
         </label>
+        {cifradoPendiente && (
+          <div className="space-y-3 rounded-xl border border-slate-200 p-3">
+            <label className="block">
+              <span className="etiqueta">Contraseña del respaldo</span>
+              <input className="campo" type="password" autoComplete="off" value={claveImportar} onChange={(e) => setClaveImportar(e.target.value)} />
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button className="btn-primario" disabled={ocupado || !claveImportar} onClick={importarCifrado}>
+                Importar
+              </button>
+              <button className="btn" disabled={ocupado} onClick={() => { setCifradoPendiente(null); setMensaje(null); }}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
         <button className="btn w-full" disabled={ocupado} onClick={exportarCsv}>
           Exportar planilla (CSV)
         </button>
@@ -166,7 +274,7 @@ function SeccionRespaldo() {
           </p>
         )}
         <p className="text-sm text-slate-500">
-          Importar no borra nada: agrega las crisis que faltan y, si una está en los dos lados, queda la versión modificada más tarde. El respaldo no está cifrado: guardalo en un lugar privado.
+          Importar no borra nada: agrega las crisis que faltan y, si una está en los dos lados, queda la versión modificada más tarde. Sin contraseña, cualquiera que tenga el archivo puede leerlo; la planilla CSV nunca va cifrada.
         </p>
       </div>
     </Seccion>

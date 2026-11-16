@@ -74,7 +74,7 @@ function Visor({ medio, onCerrar }: { medio: Medio; onCerrar: () => void }) {
   );
 }
 
-export function Medios({ crisisId }: { crisisId: string }) {
+export function Medios({ crisisId, alAgregar }: { crisisId: string; alAgregar?: () => void }) {
   const medios = useLiveQuery(() => listarMedios(crisisId), [crisisId]);
   const [abierto, setAbierto] = useState<Medio | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -101,6 +101,7 @@ export function Medios({ crisisId }: { crisisId: string }) {
           nombre: a.name,
           creadoEn: new Date().toISOString(),
         });
+        alAgregar?.();
       }
     } catch {
       setError('No se pudo guardar el archivo. Puede que falte espacio en el dispositivo.');
