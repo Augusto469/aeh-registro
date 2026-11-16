@@ -41,6 +41,7 @@ export default defineConfig({
   ],
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    // Los tests de pantallas (.tsx) piden jsdom con un comentario al inicio del archivo.
+    include: ['src/**/*.test.{ts,tsx}'],
   },
 });

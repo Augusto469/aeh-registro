@@ -23,7 +23,7 @@ App personal para registrar crisis de angioedema hereditario y compartir un resu
 ```bash
 npm install
 npm run dev      # servidor local
-npm test         # tests de dominio y repositorio
+npm test         # tests de dominio, repositorio, pantallas y contraste de colores
 npm run build    # verifica tipos y genera dist/
 ```
 
