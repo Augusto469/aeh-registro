@@ -112,7 +112,10 @@ function FilaMedicamento({ m }: { m: Medicamento }) {
 function SeccionRescate() {
   const medicamentos = useLiveQuery(listarMedicamentos, []) ?? [];
   const [nombre, setNombre] = useState('');
+  // Dos medicamentos con el mismo nombre confunden el descuento de stock (se busca por nombre).
+  const repetido = medicamentos.some((m) => m.nombre.trim().toLowerCase() === nombre.trim().toLowerCase());
   const agregar = async () => {
+    if (repetido) return;
     await guardarMedicamento({ id: nuevoId(), nombre: nombre.trim(), dosisHabitual: '' });
     setNombre('');
   };
@@ -125,10 +128,11 @@ function SeccionRescate() {
       </ul>
       <div className="mt-3 flex gap-2">
         <input className="campo" placeholder="Agregar otro medicamento" value={nombre} onChange={(e) => setNombre(e.target.value)} />
-        <button className="btn" disabled={!nombre.trim()} onClick={agregar}>
+        <button className="btn" disabled={!nombre.trim() || repetido} onClick={agregar}>
           Agregar
         </button>
       </div>
+      {repetido && <p className="mt-2 text-sm text-amber-800">Ese medicamento ya está en la lista.</p>}
       <p className="mt-2 text-sm text-slate-500">
         La dosis habitual se completa sola al registrar una crisis. Si llevás la cuenta de unidades, cada dosis que registres en una crisis descuenta una. Quitar un medicamento de la lista no cambia las crisis ya cargadas.
       </p>

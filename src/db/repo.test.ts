@@ -6,6 +6,7 @@ import { parsearRespaldo } from '../domain/respaldo';
 import { db } from './db';
 import {
   agregarMedio,
+  cerrarCrisis,
   eliminarBorrador,
   eliminarCrisis,
   eliminarPlan,
@@ -187,5 +188,39 @@ describe('repositorio', () => {
     const { planes: _p, tomas: _t, ...viejo } = respaldo;
     const antiguo = { ...viejo, crisis: viejo.crisis.map(({ evolucion: _e, ...c }) => c) };
     expect(() => parsearRespaldo(JSON.stringify(antiguo))).not.toThrow();
+  });
+
+  it('cerrar una crisis cierra también su borrador sin guardar', async () => {
+    const c = crearCrisis({ id: 'a', inicio: '2026-01-01T10:00' });
+    await guardarCrisis(c);
+    // Se cargó algo en el formulario y se salió sin guardar: queda un borrador "en curso".
+    await guardarBorrador('a', { ...c, notas: 'a medio cargar' });
+
+    await cerrarCrisis('a', '2026-01-02T09:00');
+    expect((await obtenerCrisis('a'))?.fin).toBe('2026-01-02T09:00');
+    // El borrador conserva lo que se había escrito, pero ya no reabre la crisis al guardarlo.
+    expect(await obtenerBorrador('a')).toMatchObject({ notas: 'a medio cargar', fin: '2026-01-02T09:00' });
+
+    // Cerrar de nuevo no pisa la hora de fin ya guardada.
+    await cerrarCrisis('a', '2026-01-05T09:00');
+    expect((await obtenerCrisis('a'))?.fin).toBe('2026-01-02T09:00');
+  });
+
+  it('al importar, las crisis eliminadas no se cuentan como nuevas y el id de las tomas se rearma', async () => {
+    await guardarCrisis(crearCrisis({ id: 'viva', inicio: '2026-01-01T10:00' }));
+    await guardarCrisis(crearCrisis({ id: 'borrada', inicio: '2026-01-02T10:00' }));
+    await eliminarCrisis('borrada');
+    await guardarPlan(crearPlan({ id: 'p', medicamento: 'Ácido tranexámico', desde: '2026-03-01' }));
+    await marcarToma('p', '2026-03-01', '08:00', true);
+    const respaldo = await exportarRespaldo(false);
+    // Un archivo retocado a mano: la toma trae un id que no corresponde.
+    respaldo.tomas = respaldo.tomas?.map((t) => ({ ...t, id: 'cualquier-cosa' }));
+    const texto = JSON.stringify(respaldo);
+
+    await db.delete();
+    await db.open();
+    expect(await importarRespaldo(parsearRespaldo(texto))).toMatchObject({ nuevas: 1 });
+    expect((await listarCrisis()).map((c) => c.id)).toEqual(['viva']);
+    expect((await listarTomas()).map((t) => t.id)).toEqual(['p|2026-03-01|08:00']);
   });
 });

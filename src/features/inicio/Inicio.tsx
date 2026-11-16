@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import {
-  guardarCrisis,
+  cerrarCrisis,
   listarCrisis,
   listarMedicamentos,
   listarPlanes,
@@ -97,8 +97,7 @@ export function Inicio() {
 
   const cerrar = (c: Crisis) => {
     const fin = c.sinHora ? `${soloFecha(ahoraLocal())}T00:00` : ahoraLocal();
-    // Si el inicio quedó cargado en el futuro, el fin no puede ser anterior.
-    void guardarCrisis({ ...c, fin: fin < c.inicio ? c.inicio : fin });
+    void cerrarCrisis(c.id, fin).catch(() => alert('No se pudo cerrar la crisis. Probá de nuevo.'));
   };
 
   return (

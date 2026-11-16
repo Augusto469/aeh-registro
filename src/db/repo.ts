@@ -51,6 +51,26 @@ export async function guardarCrisis(c: Crisis): Promise<void> {
   });
 }
 
+/**
+ * Cierra una crisis en curso (botón "Terminó ahora"). Si la crisis tiene un borrador sin
+ * guardar, también lo cierra: si no, al abrir el formulario el borrador la mostraría
+ * "en curso" y guardarlo la volvería a abrir, perdiendo la hora de fin.
+ */
+export async function cerrarCrisis(id: string, fin: string): Promise<void> {
+  await db.transaction('rw', db.crisis, db.ajustes, async () => {
+    const c = await db.crisis.get(id);
+    if (!c || c.eliminadoEn || c.fin !== null) return;
+    // Si el inicio quedó cargado en el futuro, el fin no puede ser anterior.
+    const cierre = fin < c.inicio ? c.inicio : fin;
+    await db.crisis.put({ ...c, fin: cierre, actualizadoEn: new Date().toISOString() });
+    const borrador = await db.ajustes.get(PREFIJO_BORRADOR + id);
+    const b = borrador?.valor as Crisis | undefined;
+    if (b && b.fin === null) {
+      await db.ajustes.put({ clave: PREFIJO_BORRADOR + id, valor: { ...b, fin: cierre < b.inicio ? b.inicio : cierre } });
+    }
+  });
+}
+
 /** Borrado lógico de la crisis (queda la marca para sincronizar) y borrado real de sus archivos. */
 export async function eliminarCrisis(id: string): Promise<void> {
   await db.transaction('rw', db.crisis, db.medios, async () => {
@@ -238,7 +258,9 @@ export interface ResultadoImportacion {
 /** Fusiona un respaldo ya validado con los datos locales. No borra nada. */
 export async function importarRespaldo(r: Respaldo): Promise<ResultadoImportacion> {
   return db.transaction('rw', [db.crisis, db.medios, db.medicamentos, db.ajustes, db.planes, db.tomas], async () => {
-    const fusion = fusionarCrisis(await db.crisis.toArray(), r.crisis);
+    const crisisLocales = await db.crisis.toArray();
+    const idsLocales = new Set(crisisLocales.map((c) => c.id));
+    const fusion = fusionarCrisis(crisisLocales, r.crisis);
     await db.crisis.bulkPut(fusion.aGuardar);
 
     // Medicamentos: se agregan los que no existen ni por nombre ni por id
@@ -276,13 +298,17 @@ export async function importarRespaldo(r: Respaldo): Promise<ResultadoImportacio
     await db.planes.bulkPut(fusionPlanes.aGuardar);
     const planesVivos = new Set((await db.planes.toArray()).filter((p) => !p.eliminadoEn).map((p) => p.id));
     // Las tomas solo se agregan: una toma desmarcada acá puede volver si estaba en el respaldo.
-    await db.tomas.bulkPut((r.tomas ?? []).filter((t) => planesVivos.has(t.planId)));
+    // El id se vuelve a armar acá (no se confía en el del archivo): es lo que evita duplicados.
+    await db.tomas.bulkPut(
+      (r.tomas ?? []).filter((t) => planesVivos.has(t.planId)).map((t) => ({ ...t, id: idToma(t.planId, t.fecha, t.horario) })),
+    );
     for (const p of fusionPlanes.aGuardar) {
       if (p.eliminadoEn) await db.tomas.where('planId').equals(p.id).delete();
     }
 
     return {
-      nuevas: fusion.nuevas,
+      // Las marcas de crisis eliminadas también viajan en el respaldo, pero no son "crisis nuevas".
+      nuevas: fusion.aGuardar.filter((c) => !idsLocales.has(c.id) && !c.eliminadoEn).length,
       actualizadas: fusion.actualizadas,
       sinCambios: fusion.sinCambios,
       medios,

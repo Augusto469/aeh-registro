@@ -154,3 +154,13 @@ describe('informe', () => {
     expect(informe.avisos).toHaveLength(3);
   });
 });
+
+describe('uso de medicación', () => {
+  it('junta el mismo medicamento aunque esté escrito con otra mayúscula', () => {
+    const lista = [
+      crearCrisis({ id: 'x', inicio: '2026-01-05T08:00', tratamientos: [trat({ medicamento: 'Icatibant' }), trat({ id: 't2', medicamento: 'icatibant ' })] }),
+      crearCrisis({ id: 'y', inicio: '2026-01-06T08:00', tratamientos: [trat({ medicamento: 'ICATIBANT' })] }),
+    ];
+    expect(usoMedicacion(lista)).toMatchObject([{ medicamento: 'Icatibant', usos: 3, crisis: 2 }]);
+  });
+});

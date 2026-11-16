@@ -24,12 +24,36 @@ export const VERSION_RESPALDO = 1;
 const claves = <T extends Record<string, string>>(o: T) =>
   z.enum(Object.keys(o) as [keyof T & string, ...(keyof T & string)[]]);
 
-const fechaHora = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
-const fecha = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+/** ¿'YYYY-MM-DD...' es un día que existe? (rechaza 2026-13-45 o 2026-02-30) */
+function diaReal(s: string): boolean {
+  const [y, m, d] = s.slice(0, 10).split('-').map(Number);
+  const f = new Date(Date.UTC(y, m - 1, d));
+  return y >= 1900 && f.getUTCMonth() === m - 1 && f.getUTCDate() === d;
+}
+
+// El archivo puede venir de cualquier lado: las fechas se validan enteras (no solo el
+// comienzo del texto), porque el resto de la app las compara y ordena como texto.
+// Se aceptan segundos por si algún navegador los agrega, y se descartan.
+const fechaHora = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d(:[0-5]\d(\.\d{1,3})?)?$/)
+  .refine(diaReal)
+  .transform((s) => s.slice(0, 16));
+const fecha = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(diaReal);
 const horario = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+/** Marca de tiempo en UTC como la escribe `toISOString()`: es la que decide qué versión gana al fusionar. */
+const marcaUtc = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/)
+  .refine((s) => !Number.isNaN(Date.parse(s)));
+/** Los ids van a parar a rutas (#/crisis/<id>) y a claves de la base: solo caracteres seguros. */
+const id = z
+  .string()
+  .regex(/^[A-Za-z0-9_-]{1,64}$/)
+  .refine((s) => s !== 'nueva'); // '/crisis/nueva' es la pantalla de crisis nueva
 
 const tratamiento = z.object({
-  id: z.string(),
+  id,
   medicamento: z.string(),
   dosis: z.string(),
   hora: fechaHora.nullable(),
@@ -37,7 +61,7 @@ const tratamiento = z.object({
 });
 
 const crisis = z.object({
-  id: z.string().min(1),
+  id,
   inicio: fechaHora,
   fin: fechaHora.nullable(),
   sinHora: z.boolean(),
@@ -54,16 +78,16 @@ const crisis = z.object({
   notas: z.string(),
   // Campos agregados después de la versión 1: opcionales para aceptar respaldos anteriores.
   evolucion: z
-    .array(z.object({ id: z.string(), hora: fechaHora, gravedad: claves(GRAVEDADES).nullable(), nota: z.string() }))
+    .array(z.object({ id, hora: fechaHora, gravedad: claves(GRAVEDADES).nullable(), nota: z.string() }))
     .optional(),
-  creadoEn: z.string(),
-  actualizadoEn: z.string(),
-  eliminadoEn: z.string().nullable(),
+  creadoEn: marcaUtc,
+  actualizadoEn: marcaUtc,
+  eliminadoEn: marcaUtc.nullable(),
 });
 
 const medioSerializado = z.object({
-  id: z.string(),
-  crisisId: z.string(),
+  id,
+  crisisId: id,
   tipo: z.enum(['foto', 'video']),
   mime: z.string(),
   nombre: z.string(),
@@ -80,7 +104,7 @@ const esquema = z.object({
   crisis: z.array(crisis),
   medicamentos: z.array(
     z.object({
-      id: z.string(),
+      id,
       nombre: z.string(),
       dosisHabitual: z.string(),
       stock: z.number().nonnegative().nullable().optional(),
@@ -102,21 +126,21 @@ const esquema = z.object({
   planes: z
     .array(
       z.object({
-        id: z.string().min(1),
+        id,
         medicamento: z.string(),
         dosis: z.string(),
         horarios: z.array(horario),
         cadaDias: z.number().int().min(1).max(365),
         desde: fecha,
         hasta: fecha.nullable(),
-        creadoEn: z.string(),
-        actualizadoEn: z.string(),
-        eliminadoEn: z.string().nullable(),
+        creadoEn: marcaUtc,
+        actualizadoEn: marcaUtc,
+        eliminadoEn: marcaUtc.nullable(),
       }),
     )
     .optional(),
   tomas: z
-    .array(z.object({ id: z.string().min(1), planId: z.string(), fecha, horario, tomadaEn: z.string() }))
+    .array(z.object({ id: z.string().min(1).max(200), planId: id, fecha, horario, tomadaEn: z.string() }))
     .optional(),
 });
 

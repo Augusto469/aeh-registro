@@ -69,15 +69,17 @@ export function usoMedicacion(lista: Crisis[]): UsoMedicamento[] {
     const vistos = new Set<string>();
     for (const t of c.tratamientos ?? []) {
       const nombre = t.medicamento.trim() || 'Sin especificar';
-      let u = mapa.get(nombre);
+      // "icatibant" e "Icatibant" son el mismo medicamento (igual que al descontar stock).
+      const clave = nombre.toLowerCase();
+      let u = mapa.get(clave);
       if (!u) {
         u = { medicamento: nombre, usos: 0, crisis: 0, funciono: 0, parcial: 0, noFunciono: 0, sinDato: 0 };
-        mapa.set(nombre, u);
+        mapa.set(clave, u);
       }
       u.usos++;
-      if (!vistos.has(nombre)) {
+      if (!vistos.has(clave)) {
         u.crisis++;
-        vistos.add(nombre);
+        vistos.add(clave);
       }
       if (t.respuesta === 'si') u.funciono++;
       else if (t.respuesta === 'parcial') u.parcial++;
