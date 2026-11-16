@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ChangeEvent } from 'react';
 import { agregarMedio, eliminarMedio, listarMedios } from '../../db/repo';
 import { nuevoId } from '../../domain/crisis';
 import type { Medio } from '../../domain/tipos';
@@ -109,6 +109,11 @@ export function Medios({ crisisId }: { crisisId: string }) {
     }
   };
 
+  const alElegir = (e: ChangeEvent<HTMLInputElement>) => {
+    void agregar(e.target.files);
+    e.target.value = '';
+  };
+
   return (
     <div>
       {medios && medios.length > 0 && (
@@ -118,20 +123,30 @@ export function Medios({ crisisId }: { crisisId: string }) {
           ))}
         </div>
       )}
-      <label className="btn w-full cursor-pointer">
-        {ocupado ? 'Guardando…' : '+ Agregar fotos o videos'}
-        <input
-          type="file"
-          accept="image/*,video/*"
-          multiple
-          className="hidden"
-          disabled={ocupado}
-          onChange={(e) => {
-            void agregar(e.target.files);
-            e.target.value = '';
-          }}
-        />
-      </label>
+      {/*
+        Tres entradas separadas: en Android, un selector que acepta fotos y videos a la vez
+        abre solo la galería. Con `capture` y un solo tipo, el celular abre la cámara directo.
+      */}
+      {ocupado ? (
+        <p className="btn w-full">Guardando…</p>
+      ) : (
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <label className="btn cursor-pointer">
+              Tomar foto
+              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={alElegir} />
+            </label>
+            <label className="btn cursor-pointer">
+              Grabar video
+              <input type="file" accept="video/*" capture="environment" className="hidden" onChange={alElegir} />
+            </label>
+          </div>
+          <label className="btn w-full cursor-pointer">
+            Elegir de la galería
+            <input type="file" accept="image/*,video/*" multiple className="hidden" onChange={alElegir} />
+          </label>
+        </div>
+      )}
       {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
       {abierto && <Visor medio={abierto} onCerrar={() => setAbierto(null)} />}
     </div>
