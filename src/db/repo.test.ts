@@ -7,6 +7,7 @@ import {
   eliminarCrisis,
   exportarRespaldo,
   guardarCrisis,
+  guardarMedicamento,
   importarRespaldo,
   listarCrisis,
   listarMedicamentos,
@@ -52,5 +53,16 @@ describe('repositorio', () => {
     expect(await importarRespaldo(parsearRespaldo(texto))).toMatchObject({ nuevas: 0, sinCambios: 1 });
     expect(await listarCrisis()).toHaveLength(1);
     expect(await listarMedicamentos()).toHaveLength(5);
+  });
+
+  it('importar no pisa un medicamento renombrado acá ni duplica nombres', async () => {
+    const texto = JSON.stringify(await exportarRespaldo(false));
+    const [primero] = await listarMedicamentos();
+    await guardarMedicamento({ ...primero, nombre: 'Nombre nuevo' });
+
+    await importarRespaldo(parsearRespaldo(texto));
+    const lista = await listarMedicamentos();
+    expect(lista).toHaveLength(5);
+    expect(lista.find((m) => m.id === primero.id)?.nombre).toBe('Nombre nuevo');
   });
 });

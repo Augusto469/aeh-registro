@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { guardarCrisis } from '../../db/repo';
 import { crearCrisis } from '../../domain/crisis';
@@ -13,10 +13,19 @@ export function Rapida() {
   const [gravedad, setGravedad] = useState<Gravedad | null>(null);
   const [inicio, setInicio] = useState(ahoraLocal());
 
+  // Evita que un doble toque en "Guardar" cree dos crisis.
+  const guardando = useRef(false);
+
   const guardar = async (completar: boolean) => {
-    const c = crearCrisis({ zonas, gravedad, inicio: inicio || ahoraLocal() });
-    await guardarCrisis(c);
-    navegar(completar ? `/crisis/${c.id}` : '/', { replace: true });
+    if (guardando.current) return;
+    guardando.current = true;
+    try {
+      const c = crearCrisis({ zonas, gravedad, inicio: inicio || ahoraLocal() });
+      await guardarCrisis(c);
+      navegar(completar ? `/crisis/${c.id}` : '/', { replace: true });
+    } catch {
+      guardando.current = false;
+    }
   };
 
   return (

@@ -60,7 +60,7 @@ export function construirInforme(
   // Orden cronológico: es como lo lee el médico.
   const lista = todas
     .filter((c) => !c.eliminadoEn && enPeriodo(c, periodo))
-    .sort((a, b) => (a.inicio < b.inicio ? -1 : 1));
+    .sort((a, b) => (a.inicio < b.inicio ? -1 : a.inicio > b.inicio ? 1 : 0));
   const r = resumen(lista, periodo);
 
   const filas: { etiqueta: string; valor: string }[] = [

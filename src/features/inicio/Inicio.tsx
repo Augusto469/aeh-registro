@@ -22,7 +22,9 @@ export function Inicio() {
 
   const cerrar = (c: Crisis) => {
     const ahora = ahoraLocal();
-    void guardarCrisis({ ...c, fin: c.sinHora ? `${soloFecha(ahora)}T00:00` : ahora });
+    const fin = c.sinHora ? `${soloFecha(ahora)}T00:00` : ahora;
+    // Si el inicio quedó cargado en el futuro, el fin no puede ser anterior.
+    void guardarCrisis({ ...c, fin: fin < c.inicio ? c.inicio : fin });
   };
 
   return (

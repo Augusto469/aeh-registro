@@ -131,10 +131,17 @@ export async function importarRespaldo(r: Respaldo): Promise<ResultadoImportacio
     const fusion = fusionarCrisis(await db.crisis.toArray(), r.crisis);
     await db.crisis.bulkPut(fusion.aGuardar);
 
-    // Medicamentos: se agregan los que no existen por nombre.
-    const nombres = new Set((await db.medicamentos.toArray()).map((m) => m.nombre.trim().toLowerCase()));
+    // Medicamentos: se agregan los que no existen ni por nombre ni por id
+    // (si acá se renombró uno, el respaldo no lo pisa).
+    const locales = await db.medicamentos.toArray();
+    const nombres = new Set(locales.map((m) => m.nombre.trim().toLowerCase()));
+    const idsMedicamentos = new Set(locales.map((m) => m.id));
     for (const m of r.medicamentos) {
-      if (!nombres.has(m.nombre.trim().toLowerCase())) await db.medicamentos.put(m);
+      const nombre = m.nombre.trim().toLowerCase();
+      if (nombres.has(nombre) || idsMedicamentos.has(m.id)) continue;
+      await db.medicamentos.put(m);
+      nombres.add(nombre);
+      idsMedicamentos.add(m.id);
     }
 
     // Perfil: solo se toma si acá está vacío.

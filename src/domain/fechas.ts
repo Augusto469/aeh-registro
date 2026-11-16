@@ -41,7 +41,12 @@ export function sumarDias(f: FechaLocal, n: number): FechaLocal {
 
 export function sumarMeses(f: FechaLocal, n: number): FechaLocal {
   const d = aDate(f);
+  const dia = d.getDate();
+  // Se pasa por el día 1 para que setMonth no desborde: 31/05 menos 3 meses es 28/02, no 03/03.
+  d.setDate(1);
   d.setMonth(d.getMonth() + n);
+  const ultimoDia = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(dia, ultimoDia));
   return soloFecha(aLocal(d));
 }
 
@@ -84,9 +89,12 @@ export function formatoFecha(s: string, sinHora = false): string {
 }
 
 export function formatoDuracion(horas: number): string {
-  if (horas < 1) return `${Math.max(1, Math.round(horas * 60))} min`;
-  if (horas < 48) return `${Math.round(horas)} h`;
-  const dias = Math.floor(horas / 24);
-  const resto = Math.round(horas - dias * 24);
+  const minutos = Math.round(horas * 60);
+  if (minutos < 60) return `${Math.max(1, minutos)} min`;
+  // Se redondea antes de separar en días y horas: 71,6 h son "3 d", no "2 d 24 h".
+  const total = Math.round(horas);
+  if (total < 48) return `${total} h`;
+  const dias = Math.floor(total / 24);
+  const resto = total - dias * 24;
   return resto ? `${dias} d ${resto} h` : `${dias} d`;
 }

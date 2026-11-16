@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { eliminarCrisis, guardarCrisis, listarMedicamentos, obtenerCrisis } from '../../db/repo';
 import { crearCrisis, nuevoId, validarCrisis } from '../../domain/crisis';
@@ -38,6 +38,7 @@ export function Formulario() {
   const [c, setC] = useState<Crisis | null>(null);
   const [noExiste, setNoExiste] = useState(false);
   const [error, setError] = useState('');
+  const saliendo = useRef(false);
   const medicamentos = useLiveQuery(listarMedicamentos, []) ?? [];
 
   useEffect(() => {
@@ -58,17 +59,32 @@ export function Formulario() {
     setError('');
   };
 
+  // `saliendo` evita que un doble toque guarde dos veces y retroceda dos pantallas.
   const guardar = async () => {
+    if (saliendo.current) return;
     const problema = validarCrisis(c);
     if (problema) return setError(problema);
-    await guardarCrisis(c);
-    navegar(-1);
+    saliendo.current = true;
+    try {
+      await guardarCrisis(c);
+      navegar(-1);
+    } catch {
+      saliendo.current = false;
+      setError('No se pudo guardar la crisis. Puede que falte espacio en el dispositivo.');
+    }
   };
 
   const eliminar = async () => {
+    if (saliendo.current) return;
     if (!confirm('¿Eliminar esta crisis y sus fotos? No se puede deshacer.')) return;
-    await eliminarCrisis(c.id);
-    navegar(-1);
+    saliendo.current = true;
+    try {
+      await eliminarCrisis(c.id);
+      navegar(-1);
+    } catch {
+      saliendo.current = false;
+      setError('No se pudo eliminar la crisis.');
+    }
   };
 
   const alternarSinHora = (sinHora: boolean) =>

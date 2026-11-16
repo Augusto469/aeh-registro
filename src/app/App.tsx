@@ -23,7 +23,11 @@ const PESTANAS = [
 /** Al cambiar de pantalla, vuelve arriba (si no, queda el scroll de la pantalla anterior). */
 function VolverArriba() {
   const { pathname } = useLocation();
-  useEffect(() => window.scrollTo(0, 0), [pathname]);
+  // Con llaves: el efecto no debe devolver nada. En navegadores nuevos scrollTo
+  // devuelve una promesa y React falla si la recibe como función de limpieza.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
   return null;
 }
 

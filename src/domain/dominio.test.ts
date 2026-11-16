@@ -10,7 +10,7 @@ import {
   validarCrisis,
 } from './crisis';
 import { crisisACsv } from './csv';
-import { formatoDuracion, formatoFecha, mesesEntre, nombreMes, sumarDias } from './fechas';
+import { formatoDuracion, formatoFecha, mesesEntre, nombreMes, sumarDias, sumarMeses } from './fechas';
 import { crearRespaldo, fusionarCrisis, parsearRespaldo } from './respaldo';
 import type { Crisis } from './tipos';
 
@@ -31,6 +31,19 @@ describe('fechas', () => {
     expect(formatoDuracion(20)).toBe('20 h');
     expect(formatoDuracion(51)).toBe('2 d 3 h');
     expect(formatoDuracion(72)).toBe('3 d');
+  });
+  it('redondea la duración antes de separar días y horas', () => {
+    expect(formatoDuracion(71.6)).toBe('3 d');
+    expect(formatoDuracion(47.6)).toBe('2 d');
+    expect(formatoDuracion(0.999)).toBe('1 h');
+    expect(formatoDuracion(0.001)).toBe('1 min');
+  });
+  it('suma meses sin desbordar al mes siguiente', () => {
+    expect(sumarMeses('2026-05-31', -3)).toBe('2026-02-28');
+    expect(sumarMeses('2026-01-31', 1)).toBe('2026-02-28');
+    expect(sumarMeses('2024-03-31', -1)).toBe('2024-02-29');
+    expect(sumarMeses('2026-01-15', -2)).toBe('2025-11-15');
+    expect(sumarMeses('2026-11-16', 6)).toBe('2027-05-16');
   });
   it('suma días cruzando de mes', () => {
     expect(sumarDias('2026-01-31', 1)).toBe('2026-02-01');
