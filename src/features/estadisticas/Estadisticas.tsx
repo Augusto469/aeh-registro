@@ -11,7 +11,7 @@ import {
   usoMedicacion,
 } from '../../domain/estadisticas';
 import { formatoDuracion, nombreMes } from '../../domain/fechas';
-import { BarrasH, Pagina, Seccion } from '../../ui/componentes';
+import { BarrasH, LeyendaCantidad, Pagina, Seccion, colorCantidad } from '../../ui/componentes';
 import { SelectorPeriodo, ultimosMeses } from '../../ui/SelectorPeriodo';
 
 function Dato({ valor, texto }: { valor: string; texto: string }) {
@@ -33,7 +33,7 @@ function BarrasMeses({ datos }: { datos: { mes: string; cantidad: number }[] }) 
         {datos.map((d) => (
           <div key={d.mes} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end">
             <span className="text-xs font-semibold tabular-nums">{d.cantidad || ''}</span>
-            <div className="w-full rounded-t bg-teal-600" style={{ height: `${(d.cantidad / max) * 85}%`, minHeight: d.cantidad ? 4 : 1 }} />
+            <div className={`w-full rounded-t ${colorCantidad(d.cantidad, max)}`} style={{ height: `${(d.cantidad / max) * 85}%`, minHeight: d.cantidad ? 4 : 1 }} />
           </div>
         ))}
       </div>
@@ -44,6 +44,7 @@ function BarrasMeses({ datos }: { datos: { mes: string; cantidad: number }[] }) 
           </span>
         ))}
       </div>
+      <LeyendaCantidad />
     </div>
   );
 }
@@ -75,9 +76,9 @@ export function Estadisticas() {
       </Seccion>
       <Seccion titulo="Gravedad">
         <BarrasH datos={[
-          { etiqueta: 'Leve', cantidad: r.porGravedad.leve },
-          { etiqueta: 'Moderada', cantidad: r.porGravedad.moderada },
-          { etiqueta: 'Grave', cantidad: r.porGravedad.grave },
+          { etiqueta: 'Leve', cantidad: r.porGravedad.leve, clase: 'bg-amber-400' },
+          { etiqueta: 'Moderada', cantidad: r.porGravedad.moderada, clase: 'bg-orange-500' },
+          { etiqueta: 'Grave', cantidad: r.porGravedad.grave, clase: 'bg-red-600' },
         ]} />
       </Seccion>
       <Seccion titulo="Zonas más frecuentes">

@@ -4,7 +4,7 @@ import { guardarCrisis } from '../../db/repo';
 import { crearCrisis } from '../../domain/crisis';
 import { ahoraLocal } from '../../domain/fechas';
 import { GRAVEDADES, ZONAS, type Gravedad, type Zona } from '../../domain/tipos';
-import { ChipsMultiples, ChipsUnico, Pagina, Seccion } from '../../ui/componentes';
+import { AyudaGravedad, ChipsMultiples, ChipsUnico, Pagina, Seccion } from '../../ui/componentes';
 
 /** Registro rápido: zona, gravedad y guardar. El resto se completa después. */
 export function Rapida() {
@@ -35,6 +35,7 @@ export function Rapida() {
       </Seccion>
       <Seccion titulo="¿Qué tan fuerte?">
         <ChipsUnico opciones={GRAVEDADES} valor={gravedad} onChange={setGravedad} />
+        <AyudaGravedad />
       </Seccion>
       <Seccion titulo="¿Cuándo empezó?">
         <input className="campo" type="datetime-local" value={inicio} max={ahoraLocal()} onChange={(e) => setInicio(e.target.value)} />

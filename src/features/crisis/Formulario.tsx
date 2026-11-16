@@ -14,7 +14,7 @@ import {
   type Crisis,
   type Tratamiento,
 } from '../../domain/tipos';
-import { Chip, ChipsMultiples, ChipsUnico, Pagina, Seccion } from '../../ui/componentes';
+import { AyudaGravedad, Chip, ChipsMultiples, ChipsUnico, Pagina, Seccion } from '../../ui/componentes';
 import { Medios } from './Medios';
 
 /** Campo de fecha que cambia entre "fecha y hora" y "solo fecha" según se recuerde o no la hora. */
@@ -151,6 +151,7 @@ export function Formulario() {
 
       <Seccion titulo="Gravedad">
         <ChipsUnico opciones={GRAVEDADES} valor={c.gravedad} onChange={(gravedad) => cambiar({ gravedad })} />
+        <AyudaGravedad />
       </Seccion>
 
       <Seccion titulo="Síntomas previos" nota="pródromos">

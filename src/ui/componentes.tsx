@@ -94,24 +94,72 @@ export function InsigniaGravedad({ gravedad }: { gravedad: Gravedad | null }) {
   return gravedad ? <Insignia className={COLOR_GRAVEDAD[gravedad]}>{GRAVEDADES[gravedad]}</Insignia> : <Insignia>Sin gravedad</Insignia>;
 }
 
-/** Barras horizontales simples, sin librería de gráficos. */
-export function BarrasH({ datos }: { datos: { etiqueta: string; cantidad: number }[] }) {
+/** Criterio para elegir la gravedad: cuánto limita la crisis la actividad diaria. */
+export function AyudaGravedad() {
+  return (
+    <ul className="mt-3 space-y-1 text-sm text-slate-600">
+      <li><strong className="text-slate-800">Leve:</strong> notás los síntomas, pero hacés tu vida normal.</li>
+      <li><strong className="text-slate-800">Moderada:</strong> te cuesta hacer tus actividades habituales o tenés que cambiarlas.</li>
+      <li><strong className="text-slate-800">Grave:</strong> no podés hacer tus actividades habituales.</li>
+      <li className="text-slate-500">Marcá la gravedad máxima que alcanzó la crisis.</li>
+    </ul>
+  );
+}
+
+/**
+ * Escala de un solo color, de claro a oscuro: cuanto mayor es la cantidad respecto
+ * del máximo del gráfico, más oscuro el tono. Las clases van escritas completas
+ * para que Tailwind las incluya.
+ */
+const TONOS_CANTIDAD = ['bg-teal-300', 'bg-teal-500', 'bg-teal-700', 'bg-teal-900'];
+
+export function colorCantidad(cantidad: number, max: number): string {
+  if (cantidad <= 0 || max <= 0) return TONOS_CANTIDAD[0];
+  const paso = Math.ceil((cantidad / max) * TONOS_CANTIDAD.length) - 1;
+  return TONOS_CANTIDAD[Math.min(TONOS_CANTIDAD.length - 1, Math.max(0, paso))];
+}
+
+/** Explica la escala de `colorCantidad` debajo de un gráfico. */
+export function LeyendaCantidad() {
+  return (
+    <p className="mt-3 flex items-center gap-2 text-xs text-slate-500">
+      Menos
+      <span className="flex gap-0.5" aria-hidden="true">
+        {TONOS_CANTIDAD.map((t) => (
+          <span key={t} className={`inline-block h-3 w-5 rounded-sm ${t}`} />
+        ))}
+      </span>
+      Más crisis
+    </p>
+  );
+}
+
+/**
+ * Barras horizontales simples, sin librería de gráficos. Por defecto el tono de cada
+ * barra depende de su cantidad; `clase` lo reemplaza cuando el color identifica otra cosa
+ * (por ejemplo, la gravedad).
+ */
+export function BarrasH({ datos }: { datos: { etiqueta: string; cantidad: number; clase?: string }[] }) {
   const max = Math.max(1, ...datos.map((d) => d.cantidad));
   if (datos.length === 0) return <p className="text-slate-500">Sin datos en este período.</p>;
+  const porCantidad = datos.some((d) => !d.clase);
   return (
-    <ul className="space-y-2">
-      {datos.map((d) => (
-        <li key={d.etiqueta}>
-          <div className="flex justify-between text-sm">
-            <span>{d.etiqueta}</span>
-            <span className="font-semibold tabular-nums">{d.cantidad}</span>
-          </div>
-          <div className="h-3 rounded-full bg-slate-100">
-            <div className="h-3 rounded-full bg-teal-600" style={{ width: `${(d.cantidad / max) * 100}%` }} />
-          </div>
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul className="space-y-2">
+        {datos.map((d) => (
+          <li key={d.etiqueta}>
+            <div className="flex justify-between text-sm">
+              <span>{d.etiqueta}</span>
+              <span className="font-semibold tabular-nums">{d.cantidad}</span>
+            </div>
+            <div className="h-3 rounded-full bg-slate-100">
+              <div className={`h-3 rounded-full ${d.clase ?? colorCantidad(d.cantidad, max)}`} style={{ width: `${(d.cantidad / max) * 100}%` }} />
+            </div>
+          </li>
+        ))}
+      </ul>
+      {porCantidad && <LeyendaCantidad />}
+    </>
   );
 }
 
