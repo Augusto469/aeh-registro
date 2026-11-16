@@ -47,11 +47,42 @@ Cada punto dice qué se eligió y por qué. Si alguna deja de servir, este es el
 
 - **El navegador puede borrar los datos** si falta espacio; en iPhone, también si la app no está instalada en la pantalla de inicio y no se usa por un tiempo. Se pide almacenamiento persistente al arrancar y el inicio avisa si pasaron más de 30 días sin respaldo.
 - **Los datos en el celular no están cifrados por la app.** La protección es el bloqueo del celular. El respaldo se puede proteger con contraseña, pero es opcional; el CSV y el PDF nunca van cifrados.
-- **Toolchain fijado por Node 16** (Vite 4, Vitest 0.34, Workbox 7.0.0, configuración en CommonJS). Conviene actualizar Node y después estas dependencias.
-- **Falta probar en un celular real**: instalación, cámara, compartir PDF y uso sin conexión, en Android y en iPhone.
+- **Probado en un celular real solo en Android** (Oppo, Chrome): instalación, uso sin conexión, cámara y compartir PDF. Falta iPhone.
+- **Quedan avisos de `npm audit` de severidad baja y moderada** en dependencias que solo se usan al compilar (las de Workbox). No llegan a la app publicada.
+
+## Tratamiento preventivo y stock
+
+- **Planes inmutables.** Un plan (`planes`) dice qué se toma, a qué horas y cada cuántos días. No se edita: si cambia la indicación se termina (`hasta`) y se crea otro. Así la adherencia de los meses anteriores se sigue calculando con lo que regía entonces.
+- **Una toma es una fila con id fijo** (`planId|fecha|horario`): marcarla dos veces no duplica y desmarcarla es borrarla. La adherencia cuenta solo las tomas cuya hora ya pasó.
+- **Sin notificaciones.** Una PWA sin servidor no puede programar avisos confiables con la app cerrada, así que las tomas del día se muestran en el inicio. La app recuerda lo que la persona cargó; no indica tratamientos.
+- **Stock opcional por medicamento** (`stock`, `stockMinimo`, `vencimiento`). Al guardar una crisis se descuenta una unidad por cada dosis nueva de un medicamento con stock (`guardarCrisis` compara con la versión guardada); quitar una dosis no la devuelve. El inicio avisa por stock bajo, sin stock, vencido o por vencer en 30 días.
+- Las tablas nuevas entraron con `version(2)` de Dexie, sin `upgrade` porque no tocan las existentes. `db/migracion.test.ts` verifica que una base de la versión 1 se abra sin perder datos.
+
+## Evolución de la crisis
+
+- `Crisis.evolucion` es una lista opcional de momentos (hora, gravedad, nota). Es opcional y no está indexada, así que no necesitó migración; las crisis anteriores no la tienen.
+- En el PDF va en la columna "Evolución y notas" (solo si se incluyen las notas) y en el CSV en su propia columna.
+
+## Interfaz
+
+- **Modo oscuro por variables CSS** (`tailwind.config.cjs`). Los colores de Tailwind que usa la app salen de variables; en oscuro cada escala se invierte (50 pasa a 950, etc.), con ajustes en los grises para distinguir fondo, tarjeta y barras. Así no hay variantes `dark:` en los componentes. `white` es la superficie de tarjetas y el texto sobre colores fuertes, por eso también se invierte; donde hace falta blanco real se usa `text-[#fff]`.
+- El tema sigue al sistema o se fuerza desde Ajustes. La elección vive en `localStorage` (preferencia del dispositivo, no dato) y la aplica un script en `index.html` antes de dibujar.
+- **Actualizaciones con aviso.** El service worker se registra en modo `prompt`: cuando hay una versión nueva aparece un cartel con "Actualizar". Ajustes muestra la versión y la fecha de compilación.
+- **Límite de errores** (`ui/ErrorBoundary`): si una pantalla falla, se muestra un mensaje en vez de la página en blanco.
+- **Bienvenida** la primera vez (sin crisis y sin haberla visto), marcada con el ajuste `bienvenidaVista`.
+
+## Estadísticas: días sin crisis
+
+- "Días con crisis" cuenta toda crisis activa ese día, aunque haya empezado antes del período. Es la única estadística que no usa la regla "una crisis pertenece al período en que empezó".
+- La comparación con el período anterior solo se muestra si ya se registraban crisis entonces, y describe la diferencia sin calificarla.
+
+## Herramientas
+
+- Vite 8, Vitest 5, TypeScript 7, vite-plugin-pwa 2 y Node 22 o superior. El proyecto es de módulos ES (`"type": "module"`); las configuraciones de Tailwind y PostCSS siguen en CommonJS, por eso llevan extensión `.cjs`.
+- Tailwind se queda en la versión 3 y React en la 18: pasar a las siguientes es una migración aparte y no aporta nada a la app por ahora.
 
 ## Para más adelante
 
-- **Escalas AAS, AECT y AE-QoL:** tablas nuevas (`version(2)`), sin tocar `Crisis`.
-- **Recordatorios de profilaxis y stock:** tabla nueva; las notificaciones de una PWA en iPhone exigen que esté instalada.
+- **Escalas AAS, AECT y AE-QoL:** AECT y AE-QoL son cuestionarios con licencia; se podrían registrar los puntajes, no las preguntas. Tablas nuevas, sin tocar `Crisis`.
+- **Notificaciones de las tomas:** harían falta un servidor de avisos push o una app nativa.
 - **Varios pacientes y sincronización:** son datos sensibles según la Ley 18.331. Antes de guardar datos de otras personas en un servidor hacen falta consentimiento informado, cifrado en tránsito y en reposo, control de acceso y registro de la base ante la URCDP. Conviene asesorarse antes de diseñar esa parte.

@@ -9,12 +9,14 @@ App personal para registrar crisis de angioedema hereditario y compartir un resu
 ## Qué hace
 
 - **Registro rápido:** zona, gravedad y guardar. Queda "en curso" y se completa después.
-- **Formulario completo:** fechas (o solo el día, para crisis pasadas), zonas, gravedad, síntomas previos, desencadenantes, medicación de rescate, atención médica, días perdidos, notas, fotos y videos.
+- **Formulario completo:** fechas (o solo el día, para crisis pasadas), zonas, gravedad, síntomas previos, desencadenantes, medicación de rescate, atención médica, días perdidos, evolución, notas, fotos y videos.
 - **Historial:** lista con filtros y calendario.
-- **Estadísticas:** crisis por mes, zonas, desencadenantes, síntomas previos y uso de medicación.
+- **Estadísticas:** crisis por mes, zonas, desencadenantes, síntomas previos, uso de medicación, días sin crisis y comparación con el período anterior.
+- **Medicación:** stock y vencimiento de la medicación de rescate, y tratamiento preventivo con las tomas del día y su cumplimiento.
 - **Informe:** PDF de un período, con resumen, gráfico, tablas y detalle; fotos y notas opcionales.
 - **Respaldo:** compartir, descargar e importar (con o sin fotos y videos, con contraseña opcional) y exportar CSV.
 - **Borrador automático:** lo que se carga en el formulario no se pierde si se sale sin guardar.
+- **Modo oscuro**, aviso cuando hay una versión nueva e introducción la primera vez.
 
 ## Cómo usarla en desarrollo
 
@@ -25,15 +27,15 @@ npm test         # tests de dominio y repositorio
 npm run build    # verifica tipos y genera dist/
 ```
 
-Las versiones de Vite, Vitest y Workbox están fijadas para que funcione con Node 16. Con Node 20 o superior se pueden actualizar.
+Necesita Node 22 o superior.
 
 ## Estructura
 
 ```
 src/
-  domain/     lógica pura y testeada: tipos, fechas, estadísticas, informe, CSV, respaldo
+  domain/     lógica pura y testeada: tipos, fechas, estadísticas, informe, CSV, respaldo, cifrado, profilaxis, medicación
   db/         esquema Dexie (db.ts) y repositorio (repo.ts): lo único que toca IndexedDB
-  features/   una carpeta por pantalla: inicio, crisis, historial, estadisticas, informe, ajustes
+  features/   una carpeta por pantalla: inicio, crisis, historial, estadisticas, informe, medicacion, ajustes
   ui/         componentes compartidos
   app/        rutas y barra de navegación
 ```

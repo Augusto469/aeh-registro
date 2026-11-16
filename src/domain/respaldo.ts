@@ -147,7 +147,8 @@ export function parsearRespaldo(texto: string): Respaldo {
   const r = esquema.safeParse(json);
   if (!r.success) {
     const p = r.error.issues[0];
-    throw new Error(`El archivo no es un respaldo válido de esta app (${p.path.join('.') || 'raíz'}: ${p.message}).`);
+    // Solo el lugar del problema: el mensaje de la librería de validación está en inglés.
+    throw new Error(`El archivo no es un respaldo válido de esta app (problema en "${p.path.join('.') || 'el archivo'}").`);
   }
   if (r.data.version > VERSION_RESPALDO)
     throw new Error('El respaldo fue creado con una versión más nueva de la app. Actualizá la app e intentá de nuevo.');

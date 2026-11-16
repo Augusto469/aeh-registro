@@ -33,14 +33,14 @@ function aBase64(bytes: Uint8Array): string {
   return btoa(texto);
 }
 
-function deBase64(texto: string): Uint8Array {
+function deBase64(texto: string): Uint8Array<ArrayBuffer> {
   const bin = atob(texto);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return bytes;
 }
 
-async function derivarClave(clave: string, sal: Uint8Array, iteraciones: number): Promise<CryptoKey> {
+async function derivarClave(clave: string, sal: Uint8Array<ArrayBuffer>, iteraciones: number): Promise<CryptoKey> {
   const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(clave), 'PBKDF2', false, ['deriveKey']);
   return crypto.subtle.deriveKey(
     { name: 'PBKDF2', salt: sal, iterations: iteraciones, hash: 'SHA-256' },
