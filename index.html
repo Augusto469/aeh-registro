@@ -10,17 +10,12 @@
     <link rel="icon" type="image/svg+xml" href="./icon.svg" />
     <link rel="apple-touch-icon" href="./icon-192.png" />
     <title>Registro de crisis de AEH</title>
-    <script>
-      // Aplica el tema elegido en Ajustes antes de dibujar, para que no parpadee (ver src/ui/tema.ts).
-      try {
-        var t = localStorage.getItem('aeh-tema');
-        if (t === 'claro' || t === 'oscuro') {
-          document.documentElement.setAttribute('data-tema', t);
-          var c = t === 'oscuro' ? '#0f172a' : '#0f766e';
-          document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) { m.content = c; });
-        }
-      } catch (e) {}
-    </script>
+    <!--
+      Aplica el tema elegido antes de dibujar, para que no parpadee. Va en un archivo aparte
+      (public/tema-inicial.js) y no en línea: la política de seguridad de contenido que se
+      agrega al compilar (vite.config.ts) no permite scripts en línea.
+    -->
+    <script src="./tema-inicial.js"></script>
   </head>
   <body>
     <div id="root"></div>

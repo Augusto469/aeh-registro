@@ -72,7 +72,11 @@ export function validarCrisis(c: Crisis, ahora: string = ahoraLocal()): string |
   // Con "solo el día" se compara la fecha; si no, fecha y hora.
   const futuro = c.sinHora ? soloFecha(c.inicio) > soloFecha(ahora) : c.inicio > ahora;
   if (futuro) return 'El inicio no puede ser una fecha futura.';
+  // Un año mal tipeado (por ejemplo 0202) estira los gráficos y el período "Todo" por siglos.
+  if (soloFecha(c.inicio) < '1900-01-01') return 'Revisá el año de la fecha de inicio.';
   if (c.fin !== null && c.fin < c.inicio) return 'El fin no puede ser anterior al inicio.';
+  // Se compara solo el día: tolera diferencias de hora (viajes) y ataja un mes o año mal puesto.
+  if (c.fin !== null && soloFecha(c.fin) > soloFecha(ahora)) return 'El fin no puede ser una fecha futura.';
   if (c.diasPerdidos !== null && (c.diasPerdidos < 0 || !Number.isFinite(c.diasPerdidos)))
     return 'Los días perdidos deben ser un número positivo.';
   return null;

@@ -155,4 +155,33 @@ describe('respaldo', () => {
     expect(f).toMatchObject({ nuevas: 1, actualizadas: 1, sinCambios: 1 });
     expect(f.aGuardar.map((c) => c.id)).toEqual(['a', 'c']);
   });
+  it('rechaza fechas, marcas de tiempo e ids que el resto de la app no sabría manejar', () => {
+    const con = (cambios: Partial<Crisis>) =>
+      JSON.stringify(crearRespaldo({ crisis: [{ ...c1, ...cambios }], medicamentos: [], perfil: null }));
+    // Fechas: se valida el texto entero y que el día exista.
+    expect(() => parsearRespaldo(con({ inicio: '2026-01-10T10:00<script>' }))).toThrow(/inicio/);
+    expect(() => parsearRespaldo(con({ inicio: '2026-13-45T10:00' }))).toThrow(/inicio/);
+    expect(() => parsearRespaldo(con({ inicio: '2026-02-30T10:00' }))).toThrow(/inicio/);
+    expect(() => parsearRespaldo(con({ fin: '2026-01-10T25:00' }))).toThrow(/fin/);
+    // Si vienen segundos se aceptan y se descartan.
+    expect(parsearRespaldo(con({ inicio: '2026-01-10T10:00:30' })).crisis[0].inicio).toBe('2026-01-10T10:00');
+    // La marca que decide qué versión gana al fusionar tiene que ser una fecha UTC de verdad.
+    expect(() => parsearRespaldo(con({ actualizadoEn: '9999' }))).toThrow(/actualizadoEn/);
+    expect(() => parsearRespaldo(con({ eliminadoEn: 'sí' }))).toThrow(/eliminadoEn/);
+    // Ids: van a rutas y claves; 'nueva' chocaría con la pantalla de crisis nueva.
+    expect(() => parsearRespaldo(con({ id: 'nueva' }))).toThrow(/id/);
+    expect(() => parsearRespaldo(con({ id: '../ajustes' }))).toThrow(/id/);
+    expect(() => parsearRespaldo(con({ id: crypto.randomUUID() }))).not.toThrow();
+  });
+});
+
+describe('validación de fechas de la crisis', () => {
+  const ahora = '2026-03-02T09:00';
+  it('no acepta un fin en un día futuro ni un año de inicio mal tipeado', () => {
+    expect(validarCrisis(base({ inicio: '2026-03-01T10:00', fin: '2026-04-01T10:00' }), ahora)).toMatch(/futura/);
+    expect(validarCrisis(base({ inicio: '2026-03-01T10:00', fin: '2027-03-01T10:00' }), ahora)).toMatch(/futura/);
+    // Más tarde el mismo día se tolera (diferencias de hora al viajar).
+    expect(validarCrisis(base({ inicio: '2026-03-01T10:00', fin: '2026-03-02T23:00' }), ahora)).toBeNull();
+    expect(validarCrisis(base({ inicio: '0202-03-01T10:00', fin: null }), ahora)).toMatch(/año/);
+  });
 });

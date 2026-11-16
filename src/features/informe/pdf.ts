@@ -178,25 +178,22 @@ export function generarPdf(d: DatosInforme, op: OpcionesPdf): Blob {
       doc.setFont('helvetica', 'bold').setFontSize(10);
       doc.text(`Crisis N.º ${f.numero} - ${f.inicio} - ${f.zonas}`, MARGEN, y);
       y += 4;
-      let col = 0;
-      let altoFila = 0;
-      for (const foto of op.fotos[f.id]) {
-        const h = Math.min(110, (anchoFoto * foto.alto) / foto.ancho);
-        const w = (h * foto.ancho) / foto.alto;
-        if (col === 0 && y + h > alto() - 16) {
+      // De a dos por fila. El salto de página se decide con la foto más alta de la fila:
+      // mirando solo la primera, una segunda foto vertical se salía de la hoja.
+      const lista = op.fotos[f.id];
+      for (let i = 0; i < lista.length; i += 2) {
+        const fila = lista.slice(i, i + 2).map((foto) => {
+          const h = Math.min(110, (anchoFoto * foto.alto) / foto.ancho);
+          return { foto, h, w: (h * foto.ancho) / foto.alto };
+        });
+        const altoFila = Math.max(...fila.map((x) => x.h));
+        if (y + altoFila > alto() - 16) {
           doc.addPage();
           y = 18;
         }
-        doc.addImage(foto.dataUrl, 'JPEG', MARGEN + col * (anchoFoto + 6), y, w, h);
-        altoFila = Math.max(altoFila, h);
-        col++;
-        if (col === 2) {
-          col = 0;
-          y += altoFila + 5;
-          altoFila = 0;
-        }
+        fila.forEach((x, col) => doc.addImage(x.foto.dataUrl, 'JPEG', MARGEN + col * (anchoFoto + 6), y, x.w, x.h));
+        y += altoFila + 5;
       }
-      if (col !== 0) y += altoFila + 5;
       y += 4;
     }
   }

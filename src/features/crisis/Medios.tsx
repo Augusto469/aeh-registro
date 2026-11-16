@@ -20,6 +20,7 @@ export async function comprimirFoto(archivo: Blob): Promise<Blob> {
     lienzo.width = Math.round(img.width * escala);
     lienzo.height = Math.round(img.height * escala);
     lienzo.getContext('2d')!.drawImage(img, 0, 0, lienzo.width, lienzo.height);
+    img.close();
     const blob = await new Promise<Blob | null>((ok) => lienzo.toBlob(ok, 'image/jpeg', 0.82));
     return blob ?? archivo;
   } catch {

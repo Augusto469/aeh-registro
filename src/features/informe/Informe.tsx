@@ -18,7 +18,9 @@ async function prepararFoto(blob: Blob): Promise<FotoInforme | null> {
     lienzo.width = img.width;
     lienzo.height = img.height;
     lienzo.getContext('2d')!.drawImage(img, 0, 0);
-    return { dataUrl: lienzo.toDataURL('image/jpeg', 0.8), ancho: img.width, alto: img.height };
+    const foto = { dataUrl: lienzo.toDataURL('image/jpeg', 0.8), ancho: img.width, alto: img.height };
+    img.close(); // libera la imagen decodificada: con muchas fotos el celular se queda sin memoria
+    return foto;
   } catch {
     return null;
   }

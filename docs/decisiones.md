@@ -76,6 +76,13 @@ Cada punto dice qué se eligió y por qué. Si alguna deja de servir, este es el
 - "Días con crisis" cuenta toda crisis activa ese día, aunque haya empezado antes del período. Es la única estadística que no usa la regla "una crisis pertenece al período en que empezó".
 - La comparación con el período anterior solo se muestra si ya se registraban crisis entonces, y describe la diferencia sin calificarla.
 
+## Seguridad
+
+- **Política de seguridad de contenido (CSP)** en la versión publicada, agregada al compilar (`vite.config.ts`): solo se carga código de la propia app y no se permite ninguna conexión hacia afuera. Por eso el script que aplica el tema antes de dibujar vive en `public/tema-inicial.js` y no en línea en `index.html`. En desarrollo no se aplica, porque Vite necesita scripts en línea.
+- **El respaldo que se importa se trata como un archivo ajeno.** Además de la forma, se valida que las fechas existan y estén completas, que las marcas de tiempo sean UTC reales (deciden qué versión gana al fusionar) y que los ids solo tengan letras, números, `-` y `_` (van a rutas y claves; `nueva` está reservado). El id de cada toma se vuelve a armar al importar.
+- **"Terminó ahora" pasa por `cerrarCrisis`**, que también cierra el borrador sin guardar de esa crisis. Antes, guardar ese borrador volvía a dejar la crisis en curso.
+- En la publicación, solo el trabajo `deploy` tiene permiso de escritura sobre Pages; el que instala dependencias y compila corre con solo lectura.
+
 ## Herramientas
 
 - Vite 8, Vitest 5, TypeScript 7, vite-plugin-pwa 2 y Node 22 o superior. El proyecto es de módulos ES (`"type": "module"`); las configuraciones de Tailwind y PostCSS siguen en CommonJS, por eso llevan extensión `.cjs`.

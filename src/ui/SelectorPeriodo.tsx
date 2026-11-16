@@ -9,6 +9,12 @@ export function ultimosMeses(n: number): Periodo {
 
 const PREDEFINIDOS = [3, 6, 12];
 
+/**
+ * Al tipear el año en una computadora el campo pasa por valores como 0002 o 0202. Con un
+ * período así las estadísticas recorren siglos día por día y la pantalla se traba.
+ */
+const fechaUsable = (v: string) => v.length === 10 && v >= '1900-01-01';
+
 /** Período compartido por Estadísticas e Informe: atajos más fechas a mano. */
 export function SelectorPeriodo(p: { periodo: Periodo; onChange: (p: Periodo) => void; crisis: Crisis[] }) {
   const igual = (a: Periodo) => a.desde === p.periodo.desde && a.hasta === p.periodo.hasta;
@@ -32,12 +38,12 @@ export function SelectorPeriodo(p: { periodo: Periodo; onChange: (p: Periodo) =>
         <label>
           <span className="etiqueta">Desde</span>
           <input className="campo" type="date" value={p.periodo.desde} max={p.periodo.hasta}
-            onChange={(e) => e.target.value && p.onChange({ ...p.periodo, desde: e.target.value })} />
+            onChange={(e) => fechaUsable(e.target.value) && p.onChange({ ...p.periodo, desde: e.target.value })} />
         </label>
         <label>
           <span className="etiqueta">Hasta</span>
           <input className="campo" type="date" value={p.periodo.hasta} min={p.periodo.desde}
-            onChange={(e) => e.target.value && p.onChange({ ...p.periodo, hasta: e.target.value })} />
+            onChange={(e) => fechaUsable(e.target.value) && p.onChange({ ...p.periodo, hasta: e.target.value })} />
         </label>
       </div>
     </div>

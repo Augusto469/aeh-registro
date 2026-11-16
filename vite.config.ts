@@ -13,6 +13,36 @@ export default defineConfig({
   },
   plugins: [
     react(),
+    {
+      // Política de seguridad de contenido, solo en la versión publicada (en desarrollo Vite
+      // necesita scripts en línea). La app no habla con ningún servidor: si por un error o una
+      // dependencia comprometida algo intentara cargar código de afuera o enviar datos, el
+      // navegador lo bloquea. Los estilos en línea se permiten porque React los usa en los gráficos.
+      name: 'aeh-csp',
+      apply: 'build',
+      transformIndexHtml: () => [
+        {
+          tag: 'meta',
+          attrs: {
+            'http-equiv': 'Content-Security-Policy',
+            content: [
+              "default-src 'self'",
+              "script-src 'self'",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' blob: data:",
+              "media-src 'self' blob:",
+              "connect-src 'self'",
+              "worker-src 'self'",
+              "manifest-src 'self'",
+              "object-src 'none'",
+              "base-uri 'self'",
+              "form-action 'none'",
+            ].join('; '),
+          },
+          injectTo: 'head-prepend',
+        },
+      ],
+    },
     VitePWA({
       // 'prompt': la versión nueva espera a que la persona toque "Actualizar" (ui/AvisoActualizacion).
       registerType: 'prompt',
