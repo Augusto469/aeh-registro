@@ -57,4 +57,12 @@ export function textoMedicacion(c: Crisis, separador = '\n'): string {
   return c.tratamientos.map(textoTratamiento).join(separador);
 }
 
+/** "05/03/2026 16:00 - Moderada - nota", un momento por línea y en orden. */
+export function textoEvolucion(c: Crisis, separador = '\n'): string {
+  return [...(c.evolucion ?? [])]
+    .sort((a, b) => a.hora.localeCompare(b.hora))
+    .map((e) => [formatoFecha(e.hora), e.gravedad ? GRAVEDADES[e.gravedad] : '', e.nota.trim()].filter(Boolean).join(' - '))
+    .join(separador);
+}
+
 export const textoDiasPerdidos = (c: Crisis) => (c.diasPerdidos === null ? SIN_DATO : String(c.diasPerdidos).replace('.', ','));

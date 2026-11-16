@@ -44,7 +44,7 @@ function Miniatura({ medio, onAbrir }: { medio: Medio; onAbrir: () => void }) {
     <button type="button" onClick={onAbrir} className="relative aspect-square overflow-hidden rounded-xl bg-slate-200" aria-label={`Abrir ${medio.tipo}`}>
       {url && medio.tipo === 'foto' && <img src={url} alt="" className="h-full w-full object-cover" />}
       {url && medio.tipo === 'video' && <video src={url} className="h-full w-full object-cover" muted preload="metadata" />}
-      {medio.tipo === 'video' && <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 text-xs text-white">Video</span>}
+      {medio.tipo === 'video' && <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 text-xs text-[#fff]">Video</span>}
     </button>
   );
 }

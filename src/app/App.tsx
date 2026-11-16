@@ -6,7 +6,11 @@ import { Historial } from '../features/historial/Historial';
 import { Informe } from '../features/informe/Informe';
 import { Formulario } from '../features/crisis/Formulario';
 import { Rapida } from '../features/crisis/Rapida';
+import { Bienvenida } from '../features/inicio/Bienvenida';
 import { Inicio } from '../features/inicio/Inicio';
+import { Medicacion } from '../features/medicacion/Medicacion';
+import { AvisoActualizacion } from '../ui/AvisoActualizacion';
+import { ErrorBoundary } from '../ui/ErrorBoundary';
 
 const PESTANAS = [
   { a: '/', texto: 'Inicio', icono: 'M3 11l9-8 9 8M5 10v10h14V10' },
@@ -36,16 +40,21 @@ export function App() {
     <HashRouter>
       <VolverArriba />
       <main>
-        <Routes>
-          <Route path="/" element={<Inicio />} />
-          <Route path="/rapida" element={<Rapida />} />
-          <Route path="/crisis/:id" element={<Formulario />} />
-          <Route path="/historial" element={<Historial />} />
-          <Route path="/estadisticas" element={<Estadisticas />} />
-          <Route path="/informe" element={<Informe />} />
-          <Route path="/ajustes" element={<Ajustes />} />
-        </Routes>
+        <ErrorBoundary>
+          <Routes>
+            <Route path="/" element={<Inicio />} />
+            <Route path="/rapida" element={<Rapida />} />
+            <Route path="/crisis/:id" element={<Formulario />} />
+            <Route path="/historial" element={<Historial />} />
+            <Route path="/estadisticas" element={<Estadisticas />} />
+            <Route path="/informe" element={<Informe />} />
+            <Route path="/ajustes" element={<Ajustes />} />
+            <Route path="/medicacion" element={<Medicacion />} />
+            <Route path="/bienvenida" element={<Bienvenida />} />
+          </Routes>
+        </ErrorBoundary>
       </main>
+      <AvisoActualizacion />
       <nav className="fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]">
         <ul className="mx-auto grid max-w-xl grid-cols-5">
           {PESTANAS.map((p) => (

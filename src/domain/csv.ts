@@ -18,11 +18,15 @@ const COLUMNAS: [string, (c: Crisis) => string][] = [
   ['medicacion', (c) => t.textoMedicacion(c, ' | ')],
   ['atencion_medica', (c) => t.textoAtencion(c)],
   ['dias_perdidos', (c) => (c.diasPerdidos === null ? '' : String(c.diasPerdidos))],
+  ['evolucion', (c) => t.textoEvolucion(c, ' | ')],
   ['notas', (c) => c.notas],
   ['id', (c) => c.id],
 ];
 
-function celda(v: string): string {
+function celda(valor: string): string {
+  // Excel interpreta como fórmula lo que empieza con = + - @ (por ejemplo una nota
+  // "- dolor fuerte" o "=..."). El apóstrofo inicial lo deja como texto.
+  const v = /^[=+\-@\t\r]/.test(valor) ? `'${valor}` : valor;
   return /[";\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
 }
 

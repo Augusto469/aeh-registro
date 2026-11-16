@@ -3,7 +3,7 @@
  * Quien llama decide el período y filtra antes con `enPeriodo`.
  */
 import { afectaViaAerea, duracionHoras } from './crisis';
-import { claveMes, diasEntre, horasEntre, mesesEntre } from './fechas';
+import { claveMes, diasEntre, horasEntre, mesesEntre, soloFecha, sumarDias } from './fechas';
 import {
   ATENCIONES,
   DESENCADENANTES,
@@ -12,6 +12,7 @@ import {
   ZONAS,
   type Atencion,
   type Crisis,
+  type FechaLocal,
   type Gravedad,
   type Periodo,
 } from './tipos';
@@ -154,6 +155,8 @@ export function resumen(lista: Crisis[], periodo: Periodo): Resumen {
       }
     }
   }
+  // Evita restos de coma flotante al sumar medios días (0,1 + 0,2 = 0,30000000000000004).
+  r.diasPerdidos = Math.round(r.diasPerdidos * 100) / 100;
   r.duracionMediaHoras = promedio(duraciones);
   r.duracionMaximaHoras = duraciones.length ? Math.max(...duraciones) : null;
   r.horasHastaTratamiento = promedio(demoras);
@@ -162,4 +165,53 @@ export function resumen(lista: Crisis[], periodo: Periodo): Resumen {
   const meses = Math.max(1, (diasEntre(periodo.desde, periodo.hasta) + 1) / DIAS_POR_MES);
   r.crisisPorMes = lista.length / meses;
   return r;
+}
+
+/** El período de igual duración inmediatamente anterior (para comparar). */
+export function periodoAnterior(p: Periodo): Periodo {
+  const dias = diasEntre(p.desde, p.hasta) + 1;
+  return { desde: sumarDias(p.desde, -dias), hasta: sumarDias(p.desde, -1) };
+}
+
+export interface DiasDelPeriodo {
+  /** Días del período ya transcurridos (hasta hoy inclusive) */
+  dias: number;
+  /** Días con al menos una crisis activa */
+  conCrisis: number;
+  libres: number;
+  /** Mayor cantidad de días seguidos sin crisis */
+  rachaLibre: number;
+}
+
+/**
+ * Días con y sin crisis dentro del período. A diferencia del resto de las estadísticas,
+ * acá cuenta toda crisis activa esos días, aunque haya empezado antes del período.
+ * Recibe todas las crisis no eliminadas, sin filtrar.
+ */
+export function diasDelPeriodo(todas: Crisis[], periodo: Periodo, hoy: FechaLocal): DiasDelPeriodo {
+  const hasta = periodo.hasta < hoy ? periodo.hasta : hoy;
+  const res: DiasDelPeriodo = { dias: 0, conCrisis: 0, libres: 0, rachaLibre: 0 };
+  if (hasta < periodo.desde) return res;
+  const ocupados = new Set<string>();
+  for (const c of todas) {
+    let ini = soloFecha(c.inicio);
+    let fin = c.fin ? soloFecha(c.fin) : hoy;
+    if (fin < ini) fin = ini;
+    if (ini < periodo.desde) ini = periodo.desde;
+    if (fin > hasta) fin = hasta;
+    for (let d = ini; d <= fin; d = sumarDias(d, 1)) ocupados.add(d);
+  }
+  let racha = 0;
+  for (let d = periodo.desde; d <= hasta; d = sumarDias(d, 1)) {
+    res.dias++;
+    if (ocupados.has(d)) {
+      res.conCrisis++;
+      racha = 0;
+    } else {
+      racha++;
+      if (racha > res.rachaLibre) res.rachaLibre = racha;
+    }
+  }
+  res.libres = res.dias - res.conCrisis;
+  return res;
 }

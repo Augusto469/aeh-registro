@@ -1,24 +1,22 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
-  eliminarMedicamento,
   exportarRespaldo,
-  guardarMedicamento,
   guardarPerfil,
   importarRespaldo,
   listarCrisis,
-  listarMedicamentos,
   obtenerPerfil,
   obtenerUltimoRespaldo,
   registrarRespaldoHecho,
 } from '../../db/repo';
 import { LARGO_MINIMO_CLAVE, cifrarRespaldo, descifrarRespaldo, esRespaldoCifrado } from '../../domain/cifrado';
-import { nuevoId } from '../../domain/crisis';
 import { crisisACsv } from '../../domain/csv';
 import { ahoraLocal, formatoFecha, aLocal, soloFecha } from '../../domain/fechas';
 import { parsearRespaldo } from '../../domain/respaldo';
 import { PERFIL_VACIO, type Perfil } from '../../domain/tipos';
-import { Pagina, Seccion, descargar } from '../../ui/componentes';
+import { ChipsUnico, Pagina, Seccion, descargar } from '../../ui/componentes';
+import { TEMAS, guardarTema, leerTema } from '../../ui/tema';
 
 const CAMPOS_PERFIL: [keyof Perfil, string, string][] = [
   ['nombre', 'Nombre y apellido', 'text'],
@@ -62,35 +60,13 @@ function SeccionPerfil() {
   );
 }
 
-function SeccionMedicamentos() {
-  const medicamentos = useLiveQuery(listarMedicamentos, []) ?? [];
-  const [nombre, setNombre] = useState('');
+function SeccionMedicacion() {
   return (
-    <Seccion titulo="Mi medicación de rescate">
-      <ul className="space-y-3">
-        {medicamentos.map((m) => (
-          <li key={m.id} className="rounded-xl border border-slate-200 p-3">
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-medium">{m.nombre}</span>
-              <button className="text-sm text-red-700 underline" onClick={() => confirm(`¿Quitar "${m.nombre}" de la lista?`) && void eliminarMedicamento(m.id)}>
-                Quitar
-              </button>
-            </div>
-            <input className="campo mt-2" placeholder="Dosis habitual (opcional)" defaultValue={m.dosisHabitual}
-              onBlur={(e) => e.target.value !== m.dosisHabitual && void guardarMedicamento({ ...m, dosisHabitual: e.target.value })} />
-          </li>
-        ))}
-      </ul>
-      <div className="mt-3 flex gap-2">
-        <input className="campo" placeholder="Agregar otro medicamento" value={nombre} onChange={(e) => setNombre(e.target.value)} />
-        <button className="btn" disabled={!nombre.trim()} onClick={async () => {
-          await guardarMedicamento({ id: nuevoId(), nombre: nombre.trim(), dosisHabitual: '' });
-          setNombre('');
-        }}>
-          Agregar
-        </button>
-      </div>
-      <p className="mt-2 text-sm text-slate-500">La dosis habitual se completa sola al registrar una crisis. Quitar un medicamento de la lista no cambia las crisis ya cargadas.</p>
+    <Seccion titulo="Medicación">
+      <p className="mb-3 text-slate-700">Tu medicación de rescate (con stock y vencimiento) y tu tratamiento preventivo.</p>
+      <Link to="/medicacion" className="btn w-full">
+        Abrir medicación
+      </Link>
     </Seccion>
   );
 }
@@ -171,7 +147,7 @@ function SeccionRespaldo() {
 
   const importarTexto = async (texto: string) => {
     const r = await importarRespaldo(parsearRespaldo(texto));
-    return `Importación lista: ${r.nuevas} crisis nuevas, ${r.actualizadas} actualizadas, ${r.sinCambios} sin cambios${r.medios ? `, ${r.medios} fotos o videos` : ''}.`;
+    return `Importación lista: ${r.nuevas} crisis nuevas, ${r.actualizadas} actualizadas, ${r.sinCambios} sin cambios${r.medios ? `, ${r.medios} fotos o videos` : ''}${r.planes ? `, ${r.planes} tratamientos preventivos` : ''}.`;
   };
 
   const importarArchivo = (archivo: File | undefined) =>
@@ -281,6 +257,23 @@ function SeccionRespaldo() {
   );
 }
 
+function SeccionApariencia() {
+  const [tema, setTema] = useState(leerTema);
+  return (
+    <Seccion titulo="Apariencia">
+      <ChipsUnico
+        opciones={TEMAS}
+        valor={tema}
+        onChange={(t) => {
+          const nuevo = t ?? 'sistema'; // tocar el activo vuelve a "según el celular"
+          setTema(nuevo);
+          guardarTema(nuevo);
+        }}
+      />
+    </Seccion>
+  );
+}
+
 function SeccionAlmacenamiento() {
   const [estado, setEstado] = useState('');
   useEffect(() => {
@@ -300,7 +293,11 @@ function SeccionAlmacenamiento() {
       <div className="space-y-2 text-slate-700">
         <p>Esta app solo registra datos. No da recomendaciones médicas ni reemplaza la consulta con tu médico.</p>
         <p>No envía información a ningún servidor.</p>
+        <p className="text-sm text-slate-500">Versión {__APP_VERSION__} ({__APP_FECHA__.split('-').reverse().join('/')}).</p>
         {estado && <p className="text-sm text-slate-500">{estado}</p>}
+        <Link to="/bienvenida" className="inline-block text-sm text-teal-800 underline">
+          Ver la introducción de nuevo
+        </Link>
       </div>
     </Seccion>
   );
@@ -310,8 +307,9 @@ export function Ajustes() {
   return (
     <Pagina titulo="Ajustes">
       <SeccionRespaldo />
-      <SeccionMedicamentos />
+      <SeccionMedicacion />
       <SeccionPerfil />
+      <SeccionApariencia />
       <SeccionAlmacenamiento />
     </Pagina>
   );

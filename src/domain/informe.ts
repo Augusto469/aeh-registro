@@ -7,13 +7,15 @@ import {
   crisisPorMes,
   frecuenciaDesencadenantes,
   frecuenciaProdromos,
+  diasDelPeriodo,
   frecuenciaZonas,
   resumen,
   usoMedicacion,
   type Conteo,
   type UsoMedicamento,
 } from './estadisticas';
-import { formatoDuracion, formatoFecha } from './fechas';
+import { formatoDuracion, formatoFecha, soloFecha } from './fechas';
+import type { Adherencia } from './profilaxis';
 import * as t from './textos';
 import type { Crisis, FechaHoraLocal, Perfil, Periodo } from './tipos';
 
@@ -31,6 +33,7 @@ export interface FilaDetalle {
   atencion: string;
   diasPerdidos: string;
   notas: string;
+  evolucion: string;
   viaAerea: boolean;
 }
 
@@ -56,12 +59,15 @@ export function construirInforme(
   perfil: Perfil,
   periodo: Periodo,
   generadoEn: FechaHoraLocal,
+  /** Adherencia al tratamiento preventivo en el período, si hay un plan cargado */
+  adherenciaProfilaxis?: Adherencia,
 ): DatosInforme {
   // Orden cronológico: es como lo lee el médico.
   const lista = todas
     .filter((c) => !c.eliminadoEn && enPeriodo(c, periodo))
     .sort((a, b) => (a.inicio < b.inicio ? -1 : a.inicio > b.inicio ? 1 : 0));
   const r = resumen(lista, periodo);
+  const dias = diasDelPeriodo(todas.filter((c) => !c.eliminadoEn), periodo, soloFecha(generadoEn));
 
   const filas: { etiqueta: string; valor: string }[] = [
     { etiqueta: 'Crisis registradas', valor: String(r.total) },
@@ -92,6 +98,21 @@ export function construirInforme(
     },
     { etiqueta: 'Días sin poder trabajar o estudiar', valor: String(r.diasPerdidos).replace('.', ',') },
   ];
+  if (dias.dias > 0) {
+    // Después del promedio por mes: los dos hablan de frecuencia.
+    filas.splice(
+      2,
+      0,
+      { etiqueta: 'Días con crisis', valor: `${dias.conCrisis} de ${dias.dias} (${dec((dias.conCrisis / dias.dias) * 100)} %)` },
+      { etiqueta: 'Mayor racha sin crisis', valor: `${dias.rachaLibre} ${dias.rachaLibre === 1 ? 'día' : 'días'}` },
+    );
+  }
+  if (adherenciaProfilaxis && adherenciaProfilaxis.porcentaje !== null) {
+    filas.push({
+      etiqueta: 'Tomas del tratamiento preventivo registradas',
+      valor: `${adherenciaProfilaxis.tomadas} de ${adherenciaProfilaxis.esperadas} (${adherenciaProfilaxis.porcentaje} %)`,
+    });
+  }
 
   const avisos: string[] = [];
   if (r.enCurso) avisos.push(`${r.enCurso} crisis seguía(n) en curso al generar el informe.`);
@@ -126,6 +147,7 @@ export function construirInforme(
       atencion: t.textoAtencion(c),
       diasPerdidos: t.textoDiasPerdidos(c),
       notas: c.notas.trim(),
+      evolucion: t.textoEvolucion(c),
       viaAerea: afectaViaAerea(c),
     })),
     avisos,

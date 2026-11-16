@@ -68,6 +68,12 @@ describe('crisis', () => {
   it('rechaza un fin anterior al inicio', () => {
     expect(validarCrisis(base({ inicio: '2026-03-02T10:00', fin: '2026-03-01T10:00' }))).toMatch(/anterior/);
     expect(validarCrisis(base({ inicio: '2026-03-02T10:00', fin: '2026-03-02T10:00' }))).toBeNull();
+    // El inicio no puede ser futuro; con "solo el día" se compara la fecha y hoy vale.
+    const ahora = '2026-03-02T09:00';
+    expect(validarCrisis(base({ inicio: '2026-03-02T10:00', fin: null }), ahora)).toMatch(/futura/);
+    expect(validarCrisis(base({ inicio: '2026-03-02T09:00', fin: null }), ahora)).toBeNull();
+    expect(validarCrisis(base({ inicio: '2026-03-02T00:00', fin: null, sinHora: true }), ahora)).toBeNull();
+    expect(validarCrisis(base({ inicio: '2026-03-03T00:00', fin: null, sinHora: true }), ahora)).toMatch(/futura/);
   });
   it('asigna la crisis al período por su fecha de inicio', () => {
     const c = base({ inicio: '2026-01-31T23:00', fin: '2026-02-03T08:00' });
@@ -104,6 +110,23 @@ describe('csv', () => {
     expect(csv.startsWith('﻿inicio;fin;')).toBe(true);
     expect(csv).toContain('"dolor; ""fuerte""\nde noche"');
     expect(csv.trim().split('\r\n')).toHaveLength(2);
+  });
+  it('no deja que una nota se interprete como fórmula en Excel', () => {
+    const csv = crisisACsv([base({ inicio: '2026-01-10T10:00', notas: '=1+1' }), base({ inicio: '2026-01-11T10:00', notas: '- dolor fuerte' })]);
+    expect(csv).toContain(";'=1+1;");
+    expect(csv).toContain(";'- dolor fuerte;");
+  });
+  it('incluye la evolución de la crisis, en orden', () => {
+    const csv = crisisACsv([
+      base({
+        inicio: '2026-01-10T10:00',
+        evolucion: [
+          { id: 'b', hora: '2026-01-10T18:00', gravedad: 'leve', nota: 'cediendo' },
+          { id: 'a', hora: '2026-01-10T12:00', gravedad: 'grave', nota: '' },
+        ],
+      }),
+    ]);
+    expect(csv).toContain('10/01/2026 12:00 - Grave | 10/01/2026 18:00 - Leve - cediendo');
   });
 });
 

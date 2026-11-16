@@ -2,14 +2,21 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import paquete from './package.json';
 
 export default defineConfig({
   // Rutas relativas: la app funciona igual en GitHub Pages (subcarpeta) o en la raíz.
   base: './',
+  define: {
+    // Se muestran en Ajustes > Acerca de, para saber qué versión quedó instalada.
+    __APP_VERSION__: JSON.stringify(paquete.version),
+    __APP_FECHA__: JSON.stringify(new Date().toISOString().slice(0, 10)),
+  },
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt': la versión nueva espera a que la persona toque "Actualizar" (ui/AvisoActualizacion).
+      registerType: 'prompt',
       includeAssets: ['icon.svg'],
       manifest: {
         name: 'Registro de crisis de AEH',

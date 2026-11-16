@@ -65,6 +65,14 @@ export interface Tratamiento {
   respuesta: Respuesta | null;
 }
 
+/** Un momento dentro de una crisis: cómo estaba a tal hora. */
+export interface RegistroEvolucion {
+  id: string;
+  hora: FechaHoraLocal;
+  gravedad: Gravedad | null;
+  nota: string;
+}
+
 /**
  * En los campos opcionales, `null` significa "todavía no lo cargué" y es distinto
  * de "ninguno" (lista vacía, 0, 'ninguna'). Así el registro rápido no distorsiona
@@ -88,6 +96,8 @@ export interface Crisis {
   atencion: Atencion | null;
   diasPerdidos: number | null;
   notas: string;
+  /** Cómo fue cambiando la crisis. Opcional: las crisis anteriores a esta función no lo tienen. */
+  evolucion?: RegistroEvolucion[];
   /** Marcas de tiempo en UTC (ISO 8601), pensadas para una futura sincronización */
   creadoEn: string;
   actualizadoEn: string;
@@ -109,6 +119,43 @@ export interface Medicamento {
   id: string;
   nombre: string;
   dosisHabitual: string;
+  /** Unidades disponibles. null o ausente = no se lleva la cuenta. */
+  stock?: number | null;
+  /** Avisar cuando queden estas unidades o menos. */
+  stockMinimo?: number | null;
+  /** Vencimiento del envase que vence primero ('' o ausente = sin dato). */
+  vencimiento?: FechaLocal;
+}
+
+/**
+ * Plan de tratamiento preventivo (profilaxis): qué se toma, a qué horas y cada cuántos días.
+ * No se edita: si cambia la indicación, se termina el plan (`hasta`) y se crea otro, para
+ * que la adherencia de los meses anteriores se siga calculando con lo que regía entonces.
+ */
+export interface PlanProfilaxis {
+  id: string;
+  medicamento: string;
+  dosis: string;
+  /** Horas del día 'HH:mm', ordenadas */
+  horarios: string[];
+  /** 1 = todos los días, 2 = día por medio, 7 = una vez por semana... */
+  cadaDias: number;
+  desde: FechaLocal;
+  /** null = sigue vigente */
+  hasta: FechaLocal | null;
+  creadoEn: string;
+  actualizadoEn: string;
+  eliminadoEn: string | null;
+}
+
+/** Una toma marcada como hecha. El id es `planId|fecha|horario`: marcar dos veces no duplica. */
+export interface Toma {
+  id: string;
+  planId: string;
+  fecha: FechaLocal;
+  horario: string;
+  /** Momento en que se marcó (UTC, ISO 8601) */
+  tomadaEn: string;
 }
 
 export interface Perfil {

@@ -1,9 +1,10 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { db } from '../../db/db';
-import { listarCrisis, obtenerPerfil } from '../../db/repo';
+import { listarCrisis, listarPlanes, listarTomas, obtenerPerfil } from '../../db/repo';
 import { ahoraLocal } from '../../domain/fechas';
 import { construirInforme } from '../../domain/informe';
+import { adherencia } from '../../domain/profilaxis';
 import { PERFIL_VACIO } from '../../domain/tipos';
 import { Pagina, Seccion, descargar } from '../../ui/componentes';
 import { SelectorPeriodo, ultimosMeses } from '../../ui/SelectorPeriodo';
@@ -26,6 +27,8 @@ async function prepararFoto(blob: Blob): Promise<FotoInforme | null> {
 export function Informe() {
   const crisis = useLiveQuery(listarCrisis, []);
   const perfil = useLiveQuery(obtenerPerfil, []) ?? PERFIL_VACIO;
+  const planes = useLiveQuery(listarPlanes, []);
+  const tomas = useLiveQuery(listarTomas, []);
   const [periodo, setPeriodo] = useState(ultimosMeses(6));
   const [incluirNotas, setIncluirNotas] = useState(true);
   const [incluirFotos, setIncluirFotos] = useState(false);
@@ -33,7 +36,8 @@ export function Informe() {
   const [error, setError] = useState('');
   if (!crisis) return null;
 
-  const datos = construirInforme(crisis, perfil, periodo, ahoraLocal());
+  const ahora = ahoraLocal();
+  const datos = construirInforme(crisis, perfil, periodo, ahora, adherencia(planes ?? [], tomas ?? [], periodo, ahora));
   const nombreArchivo = `informe-aeh-${periodo.desde}-a-${periodo.hasta}.pdf`;
 
   const generar = async (): Promise<Blob> => {

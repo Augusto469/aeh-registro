@@ -1,26 +1,37 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
-import { listarCrisis } from '../../db/repo';
+import { listarCrisis, listarPlanes, listarTomas } from '../../db/repo';
 import { enPeriodo } from '../../domain/crisis';
 import {
   crisisPorMes,
+  diasDelPeriodo,
   frecuenciaDesencadenantes,
   frecuenciaProdromos,
   frecuenciaZonas,
+  periodoAnterior,
   resumen,
   usoMedicacion,
 } from '../../domain/estadisticas';
-import { formatoDuracion, nombreMes } from '../../domain/fechas';
+import { ahoraLocal, formatoDuracion, nombreMes, soloFecha } from '../../domain/fechas';
+import { adherencia } from '../../domain/profilaxis';
 import { BarrasH, LeyendaCantidad, Pagina, Seccion, colorCantidad } from '../../ui/componentes';
-import { SelectorPeriodo, ultimosMeses } from '../../ui/SelectorPeriodo';
+import { SelectorPeriodo, hoy, ultimosMeses } from '../../ui/SelectorPeriodo';
 
-function Dato({ valor, texto }: { valor: string; texto: string }) {
+function Dato({ valor, texto, nota }: { valor: string; texto: string; nota?: string }) {
   return (
     <div className="tarjeta text-center">
       <div className="text-2xl font-bold tabular-nums">{valor}</div>
       <div className="text-sm text-slate-600">{texto}</div>
+      {nota && <div className="mt-1 text-xs text-slate-500">{nota}</div>}
     </div>
   );
+}
+
+/** "2 menos que en el período anterior". Describe la diferencia, sin calificarla. */
+function comparar(actual: number, anterior: number): string {
+  const dif = actual - anterior;
+  if (dif === 0) return 'igual que en el período anterior';
+  return `${Math.abs(dif)} ${dif > 0 ? 'más' : 'menos'} que en el período anterior`;
 }
 
 /** Barras verticales por mes. Con muchos meses solo se rotula uno de cada tantos. */
@@ -51,24 +62,34 @@ function BarrasMeses({ datos }: { datos: { mes: string; cantidad: number }[] }) 
 
 export function Estadisticas() {
   const crisis = useLiveQuery(listarCrisis, []);
+  const planes = useLiveQuery(listarPlanes, []);
+  const tomas = useLiveQuery(listarTomas, []);
   const [periodo, setPeriodo] = useState(ultimosMeses(6));
   if (!crisis) return null;
 
   const lista = crisis.filter((c) => enPeriodo(c, periodo));
   const r = resumen(lista, periodo);
   const meds = usoMedicacion(lista);
+  const dias = diasDelPeriodo(crisis, periodo, hoy());
+  const adh = adherencia(planes ?? [], tomas ?? [], periodo, ahoraLocal());
+  // Solo se compara si ya se registraban crisis en el período anterior (la lista viene de más reciente a más antigua).
+  const anterior = periodoAnterior(periodo);
+  const hayAnterior = crisis.length > 0 && soloFecha(crisis[crisis.length - 1].inicio) <= anterior.hasta;
+  const totalAnterior = crisis.filter((c) => enPeriodo(c, anterior)).length;
 
   return (
     <Pagina titulo="Estadísticas">
       <SelectorPeriodo periodo={periodo} onChange={setPeriodo} crisis={crisis} />
 
       <div className="grid grid-cols-2 gap-2">
-        <Dato valor={String(r.total)} texto="crisis" />
+        <Dato valor={String(r.total)} texto="crisis" nota={hayAnterior ? comparar(r.total, totalAnterior) : undefined} />
         <Dato valor={r.crisisPorMes.toFixed(1).replace('.', ',')} texto="promedio por mes" />
         <Dato valor={r.duracionMediaHoras === null ? '-' : formatoDuracion(r.duracionMediaHoras)} texto="duración promedio" />
         <Dato valor={String(r.diasPerdidos).replace('.', ',')} texto="días sin trabajar o estudiar" />
         <Dato valor={String(r.viaAerea)} texto="con lengua o garganta" />
         <Dato valor={String(r.porAtencion.emergencia + r.porAtencion.internacion)} texto="emergencias e internaciones" />
+        <Dato valor={String(dias.libres)} texto="días sin crisis" nota={`de ${dias.dias} días del período`} />
+        <Dato valor={String(dias.rachaLibre)} texto="días seguidos sin crisis" nota="la racha más larga" />
       </div>
 
       <Seccion titulo="Crisis por mes">
@@ -110,7 +131,19 @@ export function Estadisticas() {
           </ul>
         )}
       </Seccion>
-      <p className="text-center text-sm text-slate-500">Los campos sin cargar no se cuentan. Cada crisis se asigna al mes en que empezó.</p>
+      {adh.porcentaje !== null && (
+        <Seccion titulo="Tratamiento preventivo">
+          <p className="mb-2 text-slate-700">
+            Registraste {adh.tomadas} de {adh.esperadas} tomas ({adh.porcentaje} %).
+          </p>
+          <div className="h-3 rounded-full bg-slate-100" role="img" aria-label={`${adh.porcentaje} % de las tomas registradas`}>
+            <div className="h-3 rounded-full bg-teal-600" style={{ width: `${adh.porcentaje}%` }} />
+          </div>
+        </Seccion>
+      )}
+      <p className="text-center text-sm text-slate-500">
+        Los campos sin cargar no se cuentan. Cada crisis se asigna al mes en que empezó; los días sin crisis cuentan toda crisis activa ese día.
+      </p>
     </Pagina>
   );
 }

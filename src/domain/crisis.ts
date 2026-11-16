@@ -67,8 +67,11 @@ export const estaIncompleta = (c: Crisis): boolean => camposPendientes(c).length
 export const afectaViaAerea = (c: Crisis): boolean => c.zonas.some((z) => ZONAS_VIA_AEREA.includes(z));
 
 /** Devuelve un mensaje de error o null si la crisis se puede guardar. */
-export function validarCrisis(c: Crisis): string | null {
+export function validarCrisis(c: Crisis, ahora: string = ahoraLocal()): string | null {
   if (!c.inicio) return 'Falta la fecha de inicio.';
+  // Con "solo el día" se compara la fecha; si no, fecha y hora.
+  const futuro = c.sinHora ? soloFecha(c.inicio) > soloFecha(ahora) : c.inicio > ahora;
+  if (futuro) return 'El inicio no puede ser una fecha futura.';
   if (c.fin !== null && c.fin < c.inicio) return 'El fin no puede ser anterior al inicio.';
   if (c.diasPerdidos !== null && (c.diasPerdidos < 0 || !Number.isFinite(c.diasPerdidos)))
     return 'Los días perdidos deben ser un número positivo.';

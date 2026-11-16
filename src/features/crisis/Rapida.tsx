@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { guardarCrisis } from '../../db/repo';
-import { crearCrisis } from '../../domain/crisis';
+import { crearCrisis, validarCrisis } from '../../domain/crisis';
 import { ahoraLocal } from '../../domain/fechas';
 import { GRAVEDADES, ZONAS, type Gravedad, type Zona } from '../../domain/tipos';
 import { AyudaGravedad, ChipsMultiples, ChipsUnico, Pagina, Seccion } from '../../ui/componentes';
@@ -12,19 +12,23 @@ export function Rapida() {
   const [zonas, setZonas] = useState<Zona[]>([]);
   const [gravedad, setGravedad] = useState<Gravedad | null>(null);
   const [inicio, setInicio] = useState(ahoraLocal());
+  const [error, setError] = useState('');
 
   // Evita que un doble toque en "Guardar" cree dos crisis.
   const guardando = useRef(false);
 
   const guardar = async (completar: boolean) => {
     if (guardando.current) return;
+    const c = crearCrisis({ zonas, gravedad, inicio: inicio || ahoraLocal() });
+    const problema = validarCrisis(c);
+    if (problema) return setError(problema);
     guardando.current = true;
     try {
-      const c = crearCrisis({ zonas, gravedad, inicio: inicio || ahoraLocal() });
       await guardarCrisis(c);
       navegar(completar ? `/crisis/${c.id}` : '/', { replace: true });
     } catch {
       guardando.current = false;
+      setError('No se pudo guardar la crisis. Puede que falte espacio en el dispositivo.');
     }
   };
 
@@ -38,8 +42,18 @@ export function Rapida() {
         <AyudaGravedad />
       </Seccion>
       <Seccion titulo="¿Cuándo empezó?">
-        <input className="campo" type="datetime-local" value={inicio} max={ahoraLocal()} onChange={(e) => setInicio(e.target.value)} />
+        <input
+          className="campo"
+          type="datetime-local"
+          value={inicio}
+          max={ahoraLocal()}
+          onChange={(e) => {
+            setInicio(e.target.value);
+            setError('');
+          }}
+        />
       </Seccion>
+      {error && <p className="rounded-xl border border-red-300 bg-red-50 p-3 text-red-800">{error}</p>}
       <button className="btn-primario min-h-[64px] w-full text-xl" onClick={() => guardar(false)}>
         Guardar
       </button>

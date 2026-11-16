@@ -1,8 +1,21 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Link } from 'react-router-dom';
-import { guardarCrisis, listarCrisis, obtenerBorrador, obtenerUltimoRespaldo } from '../../db/repo';
+import { useEffect, useState } from 'react';
+import { Link, Navigate } from 'react-router-dom';
+import {
+  guardarCrisis,
+  listarCrisis,
+  listarMedicamentos,
+  listarPlanes,
+  listarTomas,
+  marcarToma,
+  obtenerBienvenidaVista,
+  obtenerBorrador,
+  obtenerUltimoRespaldo,
+} from '../../db/repo';
 import { estaIncompleta } from '../../domain/crisis';
 import { ahoraLocal, soloFecha } from '../../domain/fechas';
+import { avisosMedicacion } from '../../domain/medicacion';
+import { tomasDelDia } from '../../domain/profilaxis';
 import { textoInicio, textoZonas } from '../../domain/textos';
 import type { Crisis } from '../../domain/tipos';
 import { Pagina } from '../../ui/componentes';
@@ -10,20 +23,80 @@ import { TarjetaCrisis } from '../../ui/TarjetaCrisis';
 
 const DIAS_AVISO_RESPALDO = 30;
 
+/** Hora actual que se refresca sola cada minuto, para que "atrasada" no quede vieja con la app abierta. */
+function useAhora(): string {
+  const [ahora, setAhora] = useState(ahoraLocal);
+  useEffect(() => {
+    const reloj = setInterval(() => setAhora(ahoraLocal()), 60_000);
+    return () => clearInterval(reloj);
+  }, []);
+  return ahora;
+}
+
+/** Tomas del tratamiento preventivo que tocan hoy, para marcarlas. */
+function TomasDeHoy({ ahora }: { ahora: string }) {
+  const planes = useLiveQuery(listarPlanes, []);
+  const tomas = useLiveQuery(listarTomas, []);
+  if (!planes || !tomas) return null;
+  const hoy = soloFecha(ahora);
+  const lista = tomasDelDia(planes, tomas, hoy, ahora);
+  if (lista.length === 0) return null;
+  const hechas = lista.filter((t) => t.tomada).length;
+
+  return (
+    <section className="tarjeta">
+      <h2 className="mb-1 flex items-baseline justify-between text-lg font-semibold">
+        Tratamiento preventivo de hoy
+        <span className="text-sm font-normal text-slate-500">
+          {hechas} de {lista.length}
+        </span>
+      </h2>
+      <ul className="divide-y divide-slate-100">
+        {lista.map((t) => (
+          <li key={t.id} className="flex items-center gap-3 py-2">
+            <div className="min-w-0 flex-1">
+              <p className="font-medium">
+                {t.horario} · {t.plan.medicamento}
+              </p>
+              <p className="text-sm text-slate-600">
+                {t.plan.dosis}
+                {t.atrasada && <span className="text-amber-800">{t.plan.dosis ? ' · ' : ''}Sin marcar</span>}
+              </p>
+            </div>
+            <button
+              className={t.tomada ? 'chip chip-activo' : 'chip'}
+              aria-pressed={t.tomada}
+              onClick={() => void marcarToma(t.plan.id, t.fecha, t.horario, !t.tomada)}
+            >
+              {t.tomada ? '✓ Tomada' : 'Marcar tomada'}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function Inicio() {
   // useLiveQuery vuelve a ejecutar la consulta cada vez que cambia la base.
   const crisis = useLiveQuery(listarCrisis, []);
   const ultimoRespaldo = useLiveQuery(obtenerUltimoRespaldo, []);
   const borradorNueva = useLiveQuery(() => obtenerBorrador('nueva'), []);
-  if (!crisis) return null;
+  const bienvenidaVista = useLiveQuery(obtenerBienvenidaVista, []);
+  const medicamentos = useLiveQuery(listarMedicamentos, []);
+  const ahora = useAhora();
+  if (!crisis || bienvenidaVista === undefined) return null;
+
+  // Primera vez (sin datos y sin haber visto la introducción): se muestra la bienvenida.
+  if (!bienvenidaVista && crisis.length === 0 && !borradorNueva) return <Navigate to="/bienvenida" replace />;
 
   const abiertas = crisis.filter((c) => c.fin === null);
   const pendientes = crisis.filter((c) => c.fin !== null && estaIncompleta(c));
   const diasSinRespaldo = ultimoRespaldo ? (Date.now() - new Date(ultimoRespaldo).getTime()) / 86_400_000 : Infinity;
+  const avisos = avisosMedicacion(medicamentos ?? [], soloFecha(ahora));
 
   const cerrar = (c: Crisis) => {
-    const ahora = ahoraLocal();
-    const fin = c.sinHora ? `${soloFecha(ahora)}T00:00` : ahora;
+    const fin = c.sinHora ? `${soloFecha(ahoraLocal())}T00:00` : ahoraLocal();
     // Si el inicio quedó cargado en el futuro, el fin no puede ser anterior.
     void guardarCrisis({ ...c, fin: fin < c.inicio ? c.inicio : fin });
   };
@@ -54,10 +127,23 @@ export function Inicio() {
       </Link>
       {borradorNueva && <p className="text-center text-sm text-amber-800">Tenés una crisis a medio cargar, sin guardar.</p>}
 
+      <TomasDeHoy ahora={ahora} />
+
+      {avisos.length > 0 && (
+        <Link to="/medicacion" className="block rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-900">
+          <strong>Revisá tu medicación de rescate</strong>
+          <ul className="mt-1 list-disc pl-5">
+            {avisos.map((a) => (
+              <li key={`${a.medicamentoId}-${a.tipo}`}>{a.texto}</li>
+            ))}
+          </ul>
+        </Link>
+      )}
+
       {crisis.length > 0 && diasSinRespaldo > DIAS_AVISO_RESPALDO && (
         <Link to="/ajustes" className="block rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-900">
           <strong>{ultimoRespaldo ? `Hace ${Math.floor(diasSinRespaldo)} días que no hacés un respaldo.` : 'Todavía no hiciste ningún respaldo.'}</strong>{' '}
-          Los datos están solo en este dispositivo. Tocá acá para exportarlos.
+          Los datos están solo en este dispositivo. Tocá acá para hacer uno.
         </Link>
       )}
 

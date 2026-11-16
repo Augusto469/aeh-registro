@@ -20,6 +20,7 @@ import {
   RESPUESTAS,
   ZONAS,
   type Crisis,
+  type RegistroEvolucion,
   type Tratamiento,
 } from '../../domain/tipos';
 import { AyudaGravedad, Chip, ChipsMultiples, ChipsUnico, Pagina, Seccion } from '../../ui/componentes';
@@ -192,6 +193,13 @@ export function Formulario() {
     const resto = (trats ?? []).filter((t) => t.id !== tid);
     cambiar({ tratamientos: resto.length ? resto : null });
   };
+  // ----- Evolución -----
+  const evol = c.evolucion ?? [];
+  const cambiarEvol = (eid: string, parcial: Partial<RegistroEvolucion>) =>
+    cambiar({ evolucion: evol.map((e) => (e.id === eid ? { ...e, ...parcial } : e)) });
+  const agregarEvol = () =>
+    cambiar({ evolucion: [...evol, { id: nuevoId(), hora: c.fin === null ? ahoraLocal() : c.inicio, gravedad: null, nota: '' }] });
+
   const elegirMedicamento = (t: Tratamiento, nombre: string) => {
     const m = medicamentos.find((x) => x.nombre === nombre);
     cambiarTrat(t.id, { medicamento: nombre, dosis: t.dosis || m?.dosisHabitual || '' });
@@ -323,6 +331,39 @@ export function Formulario() {
           <input className="campo" type="number" inputMode="decimal" min={0} step={0.5} value={c.diasPerdidos ?? ''}
             onChange={(e) => cambiar({ diasPerdidos: e.target.value === '' ? null : Number(e.target.value) })} />
         </label>
+      </Seccion>
+
+      <Seccion titulo="Evolución" nota="opcional">
+        <p className="mb-3 text-sm text-slate-600">Anotá cómo fue cambiando la crisis: cuándo empeoró, cuándo empezó a ceder.</p>
+        {evol.length > 0 && (
+          <div className="mb-3 space-y-4">
+            {evol.map((e, i) => (
+              <div key={e.id} className="space-y-3 rounded-xl border border-slate-200 p-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">Momento {i + 1}</span>
+                  <button type="button" className="text-sm text-red-700 underline" onClick={() => cambiar({ evolucion: evol.filter((x) => x.id !== e.id) })}>
+                    Quitar
+                  </button>
+                </div>
+                <label className="block">
+                  <span className="etiqueta">Cuándo</span>
+                  <input className="campo" type="datetime-local" value={e.hora} onChange={(ev) => ev.target.value && cambiarEvol(e.id, { hora: ev.target.value })} />
+                </label>
+                <div>
+                  <span className="etiqueta">Cómo estaba</span>
+                  <ChipsUnico opciones={GRAVEDADES} valor={e.gravedad} onChange={(gravedad) => cambiarEvol(e.id, { gravedad })} />
+                </div>
+                <label className="block">
+                  <span className="etiqueta">Nota</span>
+                  <input className="campo" placeholder="Por ejemplo: empezó a bajar la hinchazón" value={e.nota} onChange={(ev) => cambiarEvol(e.id, { nota: ev.target.value })} />
+                </label>
+              </div>
+            ))}
+          </div>
+        )}
+        <button type="button" className="btn w-full" onClick={agregarEvol}>
+          + Agregar momento
+        </button>
       </Seccion>
 
       <Seccion titulo="Notas">

@@ -1,12 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { registerSW } from 'virtual:pwa-register';
 import { App } from './app/App';
 import { limpiarMediosHuerfanos } from './db/repo';
 import './index.css';
 
-// Service worker: deja la app en caché para usarla sin conexión y la actualiza sola.
-registerSW({ immediate: true });
+// El service worker (uso sin conexión y actualizaciones) se registra en ui/AvisoActualizacion.
 
 // Pide al navegador que no borre los datos si falta espacio (puede negarse; por eso existe el respaldo).
 void navigator.storage?.persist?.();

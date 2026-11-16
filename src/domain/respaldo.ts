@@ -14,6 +14,8 @@ import {
   type Crisis,
   type Medicamento,
   type Perfil,
+  type PlanProfilaxis,
+  type Toma,
 } from './tipos';
 
 export const APP_ID = 'aeh-registro';
@@ -23,6 +25,8 @@ const claves = <T extends Record<string, string>>(o: T) =>
   z.enum(Object.keys(o) as [keyof T & string, ...(keyof T & string)[]]);
 
 const fechaHora = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
+const fecha = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const horario = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
 
 const tratamiento = z.object({
   id: z.string(),
@@ -48,6 +52,10 @@ const crisis = z.object({
   atencion: claves(ATENCIONES).nullable(),
   diasPerdidos: z.number().nonnegative().nullable(),
   notas: z.string(),
+  // Campos agregados después de la versión 1: opcionales para aceptar respaldos anteriores.
+  evolucion: z
+    .array(z.object({ id: z.string(), hora: fechaHora, gravedad: claves(GRAVEDADES).nullable(), nota: z.string() }))
+    .optional(),
   creadoEn: z.string(),
   actualizadoEn: z.string(),
   eliminadoEn: z.string().nullable(),
@@ -70,7 +78,16 @@ const esquema = z.object({
   version: z.number().int().positive(),
   exportadoEn: z.string(),
   crisis: z.array(crisis),
-  medicamentos: z.array(z.object({ id: z.string(), nombre: z.string(), dosisHabitual: z.string() })),
+  medicamentos: z.array(
+    z.object({
+      id: z.string(),
+      nombre: z.string(),
+      dosisHabitual: z.string(),
+      stock: z.number().nonnegative().nullable().optional(),
+      stockMinimo: z.number().nonnegative().nullable().optional(),
+      vencimiento: z.union([fecha, z.literal('')]).optional(),
+    }),
+  ),
   perfil: z
     .object({
       nombre: z.string(),
@@ -82,6 +99,25 @@ const esquema = z.object({
     })
     .nullable(),
   medios: z.array(medioSerializado).optional(),
+  planes: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        medicamento: z.string(),
+        dosis: z.string(),
+        horarios: z.array(horario),
+        cadaDias: z.number().int().min(1).max(365),
+        desde: fecha,
+        hasta: fecha.nullable(),
+        creadoEn: z.string(),
+        actualizadoEn: z.string(),
+        eliminadoEn: z.string().nullable(),
+      }),
+    )
+    .optional(),
+  tomas: z
+    .array(z.object({ id: z.string().min(1), planId: z.string(), fecha, horario, tomadaEn: z.string() }))
+    .optional(),
 });
 
 export interface Respaldo {
@@ -92,6 +128,8 @@ export interface Respaldo {
   medicamentos: Medicamento[];
   perfil: Perfil | null;
   medios?: MedioSerializado[];
+  planes?: PlanProfilaxis[];
+  tomas?: Toma[];
 }
 
 export function crearRespaldo(datos: Omit<Respaldo, 'app' | 'version' | 'exportadoEn'>, ahora = new Date()): Respaldo {
@@ -116,9 +154,9 @@ export function parsearRespaldo(texto: string): Respaldo {
   return r.data as Respaldo;
 }
 
-export interface ResultadoFusion {
-  /** Crisis que hay que escribir en la base */
-  aGuardar: Crisis[];
+export interface ResultadoFusion<T = Crisis> {
+  /** Registros que hay que escribir en la base */
+  aGuardar: T[];
   nuevas: number;
   actualizadas: number;
   sinCambios: number;
@@ -128,9 +166,12 @@ export interface ResultadoFusion {
  * Importar no borra nada: fusiona por id y, si una crisis existe en los dos lados,
  * gana la que se modificó más tarde. Es la misma regla que usaría una sincronización simple.
  */
-export function fusionarCrisis(locales: Crisis[], importadas: Crisis[]): ResultadoFusion {
+export function fusionarCrisis<T extends { id: string; actualizadoEn: string } = Crisis>(
+  locales: T[],
+  importadas: T[],
+): ResultadoFusion<T> {
   const porId = new Map(locales.map((c) => [c.id, c]));
-  const res: ResultadoFusion = { aGuardar: [], nuevas: 0, actualizadas: 0, sinCambios: 0 };
+  const res: ResultadoFusion<T> = { aGuardar: [], nuevas: 0, actualizadas: 0, sinCambios: 0 };
   for (const imp of importadas) {
     const local = porId.get(imp.id);
     if (!local) {

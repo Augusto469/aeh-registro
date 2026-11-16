@@ -143,12 +143,12 @@ export function generarPdf(d: DatosInforme, op: OpcionesPdf): Blob {
     y = 16;
     titulo('Detalle de cada crisis');
     const columnas = ['N.º', 'Inicio', 'Fin', 'Duración', 'Zonas', 'Gravedad', 'Síntomas previos', 'Desencadenantes', 'Medicación de rescate', 'Atención', 'Días perdidos'];
-    if (op.incluirNotas) columnas.push('Notas');
+    if (op.incluirNotas) columnas.push('Evolución y notas');
     tabla(
       columnas,
       d.detalle.map((f) => {
         const fila = [f.numero, f.inicio, f.fin, f.duracion, f.zonas, f.gravedad, f.prodromos, f.desencadenantes, f.medicacion, f.atencion, f.diasPerdidos];
-        if (op.incluirNotas) fila.push(f.notas);
+        if (op.incluirNotas) fila.push([f.evolucion, f.notas].filter(Boolean).join('\n'));
         return fila;
       }),
       {

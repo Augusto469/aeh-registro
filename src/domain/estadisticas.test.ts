@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { crearCrisis } from './crisis';
 import {
   crisisPorMes,
+  diasDelPeriodo,
   frecuenciaDesencadenantes,
   frecuenciaZonas,
+  periodoAnterior,
   resumen,
   usoMedicacion,
 } from './estadisticas';
@@ -83,6 +85,26 @@ describe('estadísticas', () => {
     expect(r.crisisPorMes).toBeCloseTo(4 / (90 / (365.25 / 12)));
   });
 
+  it('cuenta los días con y sin crisis, incluyendo crisis que empezaron antes del período', () => {
+    const lista = [
+      crearCrisis({ inicio: '2026-02-27T10:00', fin: '2026-03-02T10:00' }), // toca 1 y 2 de marzo
+      crearCrisis({ inicio: '2026-03-10T10:00', fin: '2026-03-10T20:00' }),
+      crearCrisis({ inicio: '2026-03-10T22:00', fin: '2026-03-11T08:00' }), // se superpone con la anterior
+      crearCrisis({ inicio: '2026-03-29T10:00', fin: null }), // en curso: llega hasta hoy
+    ];
+    const d = diasDelPeriodo(lista, { desde: '2026-03-01', hasta: '2026-03-31' }, '2026-03-30');
+    // Días transcurridos: 1 al 30. Con crisis: 1, 2, 10, 11, 29 y 30.
+    expect(d).toEqual({ dias: 30, conCrisis: 6, libres: 24, rachaLibre: 17 });
+  });
+
+  it('un período que todavía no empezó no tiene días', () => {
+    expect(diasDelPeriodo([], { desde: '2026-05-01', hasta: '2026-05-31' }, '2026-03-30').dias).toBe(0);
+  });
+
+  it('calcula el período anterior de igual duración', () => {
+    expect(periodoAnterior({ desde: '2026-03-01', hasta: '2026-03-31' })).toEqual({ desde: '2026-01-29', hasta: '2026-02-28' });
+  });
+
   it('con lista vacía no divide por cero', () => {
     const r = resumen([], periodo);
     expect(r.total).toBe(0);
@@ -108,6 +130,10 @@ describe('informe', () => {
   it('arma el resumen con textos listos para mostrar', () => {
     const valor = (e: string) => informe.resumen.find((f) => f.etiqueta === e)?.valor;
     expect(valor('Crisis registradas')).toBe('4');
+    expect(valor('Días con crisis')).toMatch(/ de 90 \(/);
+    expect(valor('Mayor racha sin crisis')).toMatch(/días?$/);
+    // Sin plan de tratamiento preventivo, esa fila no aparece.
+    expect(valor('Tomas del tratamiento preventivo registradas')).toBeUndefined();
     expect(valor('Promedio por mes')).toBe('1,4');
     expect(valor('Gravedad')).toBe('Leves: 1, moderadas: 1, graves: 1, sin dato: 1');
     expect(valor('Con compromiso de lengua o garganta/laringe')).toBe('1');

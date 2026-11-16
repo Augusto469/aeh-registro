@@ -1,7 +1,7 @@
 {
   "name": "aeh-registro",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Registro personal de crisis de angioedema hereditario (PWA, datos solo en el dispositivo)",
   "scripts": {
     "dev": "vite",

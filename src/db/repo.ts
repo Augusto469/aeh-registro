@@ -3,8 +3,19 @@
  * funciones; si algún día hay backend o sincronización, se cambia acá y no en la interfaz.
  */
 import { ordenarPorInicio } from '../domain/crisis';
+import { descuentosDeStock } from '../domain/medicacion';
+import { idToma } from '../domain/profilaxis';
 import { crearRespaldo, fusionarCrisis, type MedioSerializado, type Respaldo } from '../domain/respaldo';
-import { PERFIL_VACIO, type Crisis, type Medicamento, type Medio, type Perfil } from '../domain/tipos';
+import {
+  PERFIL_VACIO,
+  type Crisis,
+  type FechaLocal,
+  type Medicamento,
+  type Medio,
+  type Perfil,
+  type PlanProfilaxis,
+  type Toma,
+} from '../domain/tipos';
 import { db } from './db';
 
 // ---------- Crisis ----------
@@ -20,8 +31,24 @@ export async function obtenerCrisis(id: string): Promise<Crisis | undefined> {
   return c && !c.eliminadoEn ? c : undefined;
 }
 
+/**
+ * Guarda la crisis. Si se le agregaron dosis de un medicamento del que se lleva stock,
+ * descuenta una unidad por dosis nueva (quitar una dosis después no la devuelve).
+ */
 export async function guardarCrisis(c: Crisis): Promise<void> {
-  await db.crisis.put({ ...c, actualizadoEn: new Date().toISOString() });
+  await db.transaction('rw', db.crisis, db.medicamentos, async () => {
+    const anterior = await db.crisis.get(c.id);
+    const yaContadas = new Set((anterior?.tratamientos ?? []).map((t) => t.id));
+    const nuevas = (c.tratamientos ?? []).filter((t) => !yaContadas.has(t.id));
+    if (nuevas.length) {
+      const medicamentos = await db.medicamentos.toArray();
+      for (const [id, unidades] of descuentosDeStock(nuevas, medicamentos)) {
+        const m = medicamentos.find((x) => x.id === id);
+        if (m) await db.medicamentos.put({ ...m, stock: Math.max(0, (m.stock ?? 0) - unidades) });
+      }
+    }
+    await db.crisis.put({ ...c, actualizadoEn: new Date().toISOString() });
+  });
 }
 
 /** Borrado lógico de la crisis (queda la marca para sincronizar) y borrado real de sus archivos. */
@@ -107,6 +134,52 @@ export const obtenerPerfil = () => leerAjuste<Perfil>('perfil', PERFIL_VACIO);
 export const guardarPerfil = (p: Perfil) => db.ajustes.put({ clave: 'perfil', valor: p });
 /** Fecha ISO del último respaldo exportado, o null si nunca se hizo. */
 export const obtenerUltimoRespaldo = () => leerAjuste<string | null>('ultimoRespaldo', null);
+/** ¿Ya se mostró la introducción de la primera vez? */
+export const obtenerBienvenidaVista = () => leerAjuste<boolean>('bienvenidaVista', false);
+export async function marcarBienvenidaVista(): Promise<void> {
+  await db.ajustes.put({ clave: 'bienvenidaVista', valor: true });
+}
+
+// ---------- Tratamiento preventivo ----------
+
+/** Planes no eliminados, los vigentes primero y después por medicamento. */
+export async function listarPlanes(): Promise<PlanProfilaxis[]> {
+  const planes = (await db.planes.toArray()).filter((p) => !p.eliminadoEn);
+  return planes.sort(
+    (a, b) => Number(a.hasta !== null) - Number(b.hasta !== null) || a.medicamento.localeCompare(b.medicamento) || a.desde.localeCompare(b.desde),
+  );
+}
+
+export async function guardarPlan(p: PlanProfilaxis): Promise<void> {
+  await db.planes.put({ ...p, actualizadoEn: new Date().toISOString() });
+}
+
+/** Termina el plan en esa fecha: deja de pedir tomas, pero su historial sigue contando. */
+export async function terminarPlan(id: string, hasta: FechaLocal): Promise<void> {
+  const p = await db.planes.get(id);
+  if (p) await guardarPlan({ ...p, hasta: hasta < p.desde ? p.desde : hasta });
+}
+
+/** Borrado lógico del plan y borrado real de sus tomas: desaparece también del historial. */
+export async function eliminarPlan(id: string): Promise<void> {
+  await db.transaction('rw', db.planes, db.tomas, async () => {
+    const p = await db.planes.get(id);
+    if (p) {
+      const ahora = new Date().toISOString();
+      await db.planes.put({ ...p, eliminadoEn: ahora, actualizadoEn: ahora });
+    }
+    await db.tomas.where('planId').equals(id).delete();
+  });
+}
+
+export const listarTomas = (): Promise<Toma[]> => db.tomas.toArray();
+
+/** Marca o desmarca una toma. Marcar dos veces la misma no duplica (el id es fijo). */
+export async function marcarToma(planId: string, fecha: FechaLocal, horario: string, tomada: boolean): Promise<void> {
+  const id = idToma(planId, fecha, horario);
+  if (tomada) await db.tomas.put({ id, planId, fecha, horario, tomadaEn: new Date().toISOString() });
+  else await db.tomas.delete(id);
+}
 
 // ---------- Respaldo ----------
 
@@ -127,10 +200,12 @@ function base64ABlob(datos: string, mime: string): Blob {
 }
 
 export async function exportarRespaldo(incluirMedios: boolean): Promise<Respaldo> {
-  const [crisis, medicamentos, perfil] = await Promise.all([
+  const [crisis, medicamentos, perfil, planes, tomas] = await Promise.all([
     db.crisis.toArray(), // incluye las eliminadas: sus marcas viajan en el respaldo
     db.medicamentos.toArray(),
     obtenerPerfil(),
+    db.planes.toArray(),
+    db.tomas.toArray(),
   ]);
   let medios: MedioSerializado[] | undefined;
   if (incluirMedios) {
@@ -140,7 +215,7 @@ export async function exportarRespaldo(incluirMedios: boolean): Promise<Respaldo
       medios.push({ ...resto, datos: await blobABase64(blob) });
     }
   }
-  return crearRespaldo({ crisis, medicamentos, perfil, medios });
+  return crearRespaldo({ crisis, medicamentos, perfil, medios, planes, tomas });
 }
 
 /**
@@ -156,11 +231,13 @@ export interface ResultadoImportacion {
   actualizadas: number;
   sinCambios: number;
   medios: number;
+  /** Planes de tratamiento preventivo agregados o actualizados */
+  planes: number;
 }
 
 /** Fusiona un respaldo ya validado con los datos locales. No borra nada. */
 export async function importarRespaldo(r: Respaldo): Promise<ResultadoImportacion> {
-  return db.transaction('rw', db.crisis, db.medios, db.medicamentos, db.ajustes, async () => {
+  return db.transaction('rw', [db.crisis, db.medios, db.medicamentos, db.ajustes, db.planes, db.tomas], async () => {
     const fusion = fusionarCrisis(await db.crisis.toArray(), r.crisis);
     await db.crisis.bulkPut(fusion.aGuardar);
 
@@ -193,6 +270,23 @@ export async function importarRespaldo(r: Respaldo): Promise<ResultadoImportacio
     for (const c of fusion.aGuardar) {
       if (c.eliminadoEn) await db.medios.where('crisisId').equals(c.id).delete();
     }
-    return { nuevas: fusion.nuevas, actualizadas: fusion.actualizadas, sinCambios: fusion.sinCambios, medios };
+
+    // Tratamiento preventivo: misma regla que las crisis (gana la última modificación).
+    const fusionPlanes = fusionarCrisis(await db.planes.toArray(), r.planes ?? []);
+    await db.planes.bulkPut(fusionPlanes.aGuardar);
+    const planesVivos = new Set((await db.planes.toArray()).filter((p) => !p.eliminadoEn).map((p) => p.id));
+    // Las tomas solo se agregan: una toma desmarcada acá puede volver si estaba en el respaldo.
+    await db.tomas.bulkPut((r.tomas ?? []).filter((t) => planesVivos.has(t.planId)));
+    for (const p of fusionPlanes.aGuardar) {
+      if (p.eliminadoEn) await db.tomas.where('planId').equals(p.id).delete();
+    }
+
+    return {
+      nuevas: fusion.nuevas,
+      actualizadas: fusion.actualizadas,
+      sinCambios: fusion.sinCambios,
+      medios,
+      planes: fusionPlanes.aGuardar.filter((p) => !p.eliminadoEn).length,
+    };
   });
 }

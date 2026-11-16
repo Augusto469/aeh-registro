@@ -1,25 +1,32 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { crearCrisis } from '../domain/crisis';
+import { crearPlan } from '../domain/profilaxis';
 import { parsearRespaldo } from '../domain/respaldo';
 import { db } from './db';
 import {
   agregarMedio,
   eliminarBorrador,
   eliminarCrisis,
+  eliminarPlan,
   exportarRespaldo,
   guardarBorrador,
   guardarCrisis,
   guardarMedicamento,
+  guardarPlan,
   importarRespaldo,
   limpiarMediosHuerfanos,
   listarCrisis,
   listarMedicamentos,
   listarMedios,
+  listarPlanes,
+  listarTomas,
+  marcarToma,
   obtenerBorrador,
   obtenerCrisis,
   obtenerUltimoRespaldo,
   registrarRespaldoHecho,
+  terminarPlan,
 } from './repo';
 
 beforeEach(async () => {
@@ -110,5 +117,75 @@ describe('repositorio', () => {
     expect(await listarMedios('guardada')).toHaveLength(1);
     expect(await listarMedios('en-borrador')).toHaveLength(1);
     expect(await listarMedios('abandonada')).toHaveLength(0);
+  });
+
+  it('descuenta stock una sola vez por cada dosis nueva al guardar una crisis', async () => {
+    const [med] = await listarMedicamentos();
+    await guardarMedicamento({ ...med, stock: 3 });
+    const dosis = (id: string) => ({ id, medicamento: med.nombre, dosis: '', hora: null, respuesta: null });
+    const stock = async () => (await listarMedicamentos()).find((m) => m.id === med.id)?.stock;
+
+    const c = crearCrisis({ id: 'a', inicio: '2026-01-01T10:00', tratamientos: [dosis('t1')] });
+    await guardarCrisis(c);
+    expect(await stock()).toBe(2);
+    // Volver a guardar la misma crisis no descuenta de nuevo; agregar otra dosis sí.
+    await guardarCrisis({ ...c, notas: 'editada' });
+    expect(await stock()).toBe(2);
+    await guardarCrisis({ ...c, tratamientos: [dosis('t1'), dosis('t2'), dosis('t3'), dosis('t4')] });
+    expect(await stock()).toBe(0); // nunca baja de cero
+  });
+
+  it('no toca el stock de un medicamento del que no se lleva la cuenta', async () => {
+    const [med] = await listarMedicamentos();
+    await guardarCrisis(
+      crearCrisis({ id: 'a', inicio: '2026-01-01T10:00', tratamientos: [{ id: 't1', medicamento: med.nombre, dosis: '', hora: null, respuesta: null }] }),
+    );
+    expect((await listarMedicamentos()).find((m) => m.id === med.id)?.stock).toBeUndefined();
+  });
+
+  it('guarda planes de tratamiento preventivo y marca tomas sin duplicarlas', async () => {
+    const plan = crearPlan({ id: 'p', medicamento: 'Ácido tranexámico', desde: '2026-03-01', horarios: ['08:00', '20:00'] });
+    await guardarPlan(plan);
+    await marcarToma('p', '2026-03-01', '08:00', true);
+    await marcarToma('p', '2026-03-01', '08:00', true);
+    await marcarToma('p', '2026-03-01', '20:00', true);
+    expect(await listarTomas()).toHaveLength(2);
+    await marcarToma('p', '2026-03-01', '20:00', false);
+    expect((await listarTomas()).map((t) => t.horario)).toEqual(['08:00']);
+
+    await terminarPlan('p', '2026-03-10');
+    expect((await listarPlanes())[0].hasta).toBe('2026-03-10');
+
+    await eliminarPlan('p');
+    expect(await listarPlanes()).toHaveLength(0);
+    expect(await listarTomas()).toHaveLength(0);
+  });
+
+  it('el respaldo lleva el tratamiento preventivo, el stock y la evolución, y acepta respaldos anteriores', async () => {
+    const [med] = await listarMedicamentos();
+    await guardarMedicamento({ ...med, stock: 4, stockMinimo: 1, vencimiento: '2027-05-31' });
+    await guardarCrisis(
+      crearCrisis({ id: 'a', inicio: '2026-01-01T10:00', evolucion: [{ id: 'e', hora: '2026-01-01T14:00', gravedad: 'grave', nota: 'peor' }] }),
+    );
+    await guardarPlan(crearPlan({ id: 'p', medicamento: 'Ácido tranexámico', desde: '2026-03-01' }));
+    await marcarToma('p', '2026-03-01', '08:00', true);
+    const respaldo = await exportarRespaldo(false);
+    const texto = JSON.stringify(respaldo);
+
+    await db.delete();
+    await db.open();
+    const res = await importarRespaldo(parsearRespaldo(texto));
+    expect(res).toMatchObject({ nuevas: 1, planes: 1 });
+    expect((await obtenerCrisis('a'))?.evolucion?.[0].nota).toBe('peor');
+    expect(await listarPlanes()).toHaveLength(1);
+    expect(await listarTomas()).toHaveLength(1);
+    // Importar de nuevo no duplica.
+    expect(await importarRespaldo(parsearRespaldo(texto))).toMatchObject({ nuevas: 0, planes: 0 });
+    expect(await listarTomas()).toHaveLength(1);
+
+    // Un respaldo de la versión anterior de la app no trae planes, tomas ni evolución.
+    const { planes: _p, tomas: _t, ...viejo } = respaldo;
+    const antiguo = { ...viejo, crisis: viejo.crisis.map(({ evolucion: _e, ...c }) => c) };
+    expect(() => parsearRespaldo(JSON.stringify(antiguo))).not.toThrow();
   });
 });
