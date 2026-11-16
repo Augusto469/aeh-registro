@@ -41,7 +41,9 @@ Las decisiones técnicas y lo que queda pendiente están en [docs/decisiones.md]
 
 ## Publicación
 
-`.github/workflows/deploy.yml` corre los tests, compila y publica en GitHub Pages. **Está pausado**: el repositorio es privado y la cuenta gratuita no permite Pages en repositorios privados. Para reactivarlo (con GitHub Pro, gratis con el Student Pack), hay que volver a agregar el disparador `push` a `main` en ese archivo y elegir **Settings > Pages > Source: GitHub Actions**.
+`.github/workflows/deploy.yml` corre los tests, compila y publica en GitHub Pages con cada push a `main`. Necesita **Settings > Pages > Source: GitHub Actions** y, con la cuenta gratuita, que el repositorio sea público.
+
+La app queda en <https://augusto469.github.io/aeh-registro/>. Para instalarla en el celular se abre esa dirección una vez (Chrome en Android, Safari en iPhone) y se elige "Instalar app" o "Agregar a inicio"; después funciona sin conexión.
 
 ## Privacidad
 
